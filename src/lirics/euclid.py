@@ -18,7 +18,7 @@ class Geometry:
 
     rim_tangent_lines_angle: float
 
-    def __post__init__(self):
+    def __post_init__(self):
         self.cell_angular_width = 2*np.pi/self.number_of_cell
 
         if self.transition_radius is None:  # check how to implement this better
