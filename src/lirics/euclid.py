@@ -31,7 +31,7 @@ class Geometry:
 class GeometrySingle(Geometry):
 
     excentricity: float
-    case_raius: float
+    case_radius: float
 
 
 @dataclass
