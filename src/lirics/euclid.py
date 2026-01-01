@@ -311,9 +311,14 @@ class Geometry:
         """Computes area of full sector fromed by cell and corresponding sector in cell's
         external region."""
 
+        angular_width_of_vane = self.impeller.vane.equation(
+            self.impeller.rim_radius)
+        half_width_of_cell = self.impeller.angular_width_of_cell/2
+
         area_of_case_sector = self.case.area_of_sector(
-            angle - self.impeller.angular_width_of_cell/2,
-            angle + self.impeller.angular_width_of_cell/2, self.impeller.rim_radius)
+            angle + angular_width_of_vane - half_width_of_cell,
+            angle + angular_width_of_vane + half_width_of_cell,
+            self.impeller.rim_radius)
 
         total_area_of_sector = self.impeller.total_area_of_cell + area_of_case_sector
 
