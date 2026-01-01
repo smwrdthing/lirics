@@ -299,35 +299,3 @@ class EllipticCase(Case):
             (np.sin(angle)/self.major_semiaxis)**2)**-0.5
 
         return radius_vector
-
-
-class Geometry:
-
-    def __init__(self, impeller: Impeller, case: Case) -> None:
-        self.impeller = impeller
-        self.case = case
-
-    def area_of_sector(self, angle):
-        """Computes area of full sector fromed by cell and corresponding sector in cell's
-        external region."""
-
-        angular_width_of_vane = self.impeller.vane.equation(
-            self.impeller.rim_radius)
-        half_width_of_cell = self.impeller.angular_width_of_cell/2
-
-        area_of_case_sector = self.case.area_of_sector(
-            angle + angular_width_of_vane - half_width_of_cell,
-            angle + angular_width_of_vane + half_width_of_cell,
-            self.impeller.rim_radius)
-
-        total_area_of_sector = self.impeller.total_area_of_cell + area_of_case_sector
-
-        return total_area_of_sector
-
-    def volume_of_sector(self, angle):
-        """Computes volume of full sector fromed by cell and corresponding sector in
-        cell's external region."""
-
-        area = self.area_of_sector(angle)
-
-        return area*self.case.length
