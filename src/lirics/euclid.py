@@ -295,8 +295,8 @@ class EllipticCase(Case):
     def equation(self, angle):
 
         radius_vector = (
-            np.cos(angle)**2/self.minor_semiaxis +
-            np.sin(angle)**2/self.major_semiaxis)**-0.5
+            (np.cos(angle)/self.minor_semiaxis)**2 +
+            (np.sin(angle)/self.major_semiaxis)**2)**-0.5
 
         return radius_vector
 
