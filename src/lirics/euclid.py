@@ -11,7 +11,6 @@ import numpy as np
 
 from lirics.leibniz import function_derivative
 
-# TODO : type annotations in methods
 STEP = 0.5e-3
 PARTITIONS = 100
 
