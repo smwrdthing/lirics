@@ -1,11 +1,29 @@
 from __future__ import annotations
+from typing import Callable, overload
 from numpy import float64
 from numpy.typing import NDArray
 
 import numpy as np
 
 
-def derivative(y: NDArray[float64], x: NDArray[float64]) -> NDArray[float64]:
+@overload
+def function_derivative(
+        func: Callable[[float], float], x: float, dx: float) -> float:
+    ...
+
+
+@overload
+def function_derivative(
+        func: Callable[[NDArray[float64], NDArray[float64]]],
+        x: NDArray[float64], dx: float) -> NDArray[float64]:
+    ...
+
+
+def function_derivative(func, x, dx):
+    return (func(x+dx)-func(x-dx))/(2*dx)
+
+
+def tabular_derivative(y: NDArray[float64], x: NDArray[float64]) -> NDArray[float64]:
     """Computes derivative with tabulated function values y corresponding
     to points x with second order of error."""
     dydx = np.zeros_like(x)
