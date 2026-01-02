@@ -381,3 +381,62 @@ class EllipticCase(Case):
             (np.sin(angle)/self.major_semiaxis)**2)**-0.5
 
         return radius_vector
+
+
+def compute_total_sector_area(
+        sector_geometry: tuple[Vane, Cell, Frame],
+        angle: float, partitions=PARTITIONS) -> NDArray[float64]:
+
+    vane, impeller, frame = sector_geometry
+
+    width_of_vane = vane.angular_width
+    half_width_of_cell = impeller.angular_width/2
+
+    tip_angle = angle + width_of_vane
+
+    start_angle = tip_angle - half_width_of_cell
+    end_angle = tip_angle + half_width_of_cell
+
+    angle_range = np.linspace(start_angle, end_angle, partitions)
+
+    frame_sector_area = frame.sector_area(
+        angle_range, impeller.rim_radius)
+    cell_area = impeller.total_area
+
+    total_sector_area = frame_sector_area + cell_area
+
+    return total_sector_area
+
+
+def compute_total_sector_volume(
+        sector_geometry: tuple[Vane, Cell, Frame],
+        angle: float, partitions=PARTITIONS) -> NDArray[float64]:
+
+    total_sector_area = compute_total_sector_area(
+        sector_geometry, angle, partitions)
+
+    # Take impeller's length for computations
+    length = sector_geometry[1].length
+
+    return length*total_sector_area
+
+
+def vane_path(
+    vane: Vane, from_radius: float, to_radius: float,
+    angular_shift: float = 0.0, partitions: int = PARTITIONS
+) -> tuple[NDArray[float64], NDArray[float64]]:
+
+    radius = np.linspace(from_radius, to_radius, partitions)
+    angle = vane.equation(radius)+angular_shift
+
+    return radius, angle
+
+
+def arch_path(
+    radius: float, from_angle: float, to_angle: float,
+    partition: int = PARTITIONS
+) -> tuple[NDArray[float64], NDArray[float64]]:
+
+    angle = np.linspace(from_angle, to_angle, partition)
+
+    return np.ones_like(angle)*radius, angle
