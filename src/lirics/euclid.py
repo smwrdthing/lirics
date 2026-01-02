@@ -49,10 +49,20 @@ class Vane(ABC):
         corresponds to given radius."""
         raise
 
-    def slope(self, radius: NDArray[float64], step: float = STEP):
-        """Computes vane's midline slope for given radial coordinate with
+    def derivative(self, radius: NDArray[float64], step: float = STEP):
+        """Computes vane's midline derivative for given radial coordinate with
         central finite difference approximation of derivative."""
         return function_derivative(self.equation, radius, step)
+
+    def slope(self, radius, step=STEP):
+
+        angle = self.equation(radius)
+        deriv = self.derivative(radius, step)
+
+        incline = ((np.sin(angle)+radius*deriv*np.cos(angle)) /
+                   (np.cos(angle)-radius*deriv*np.sin(angle)))
+
+        return incline
 
     def length(self, radius_range: NDArray[float64] | None = None) -> NDArray[float64]:
         """Computes length of vane's with numerical trapezoid integration over provided
@@ -61,8 +71,8 @@ class Vane(ABC):
         if radius_range is None:
             radius_range = self.total_radius_range
 
-        slope = self.slope(radius_range)
-        func = np.sqrt(1+radius_range**2*slope**2)
+        deriv = self.derivative(radius_range)
+        func = np.sqrt(1+radius_range**2*deriv**2)
         length = np.trapezoid(func, radius_range, axis=0)
 
         return length
@@ -91,14 +101,10 @@ class Vane(ABC):
         """Computes angle between vane's tangent and circle's tangent for given radius."""
 
         vane_angle = self.equation(radius)
-        vane_slope_angle = np.arctan(self.slope(radius))
-        circle_slope_angle = np.arctan(circle_slope(vane_angle))
+        circle_slope_angle = vane_angle + np.pi/2
+        vane_slope_angle = np.arctan(self.slope(radius, step))
 
-        # circle slope will be negative in our case and arctan returns angles in
-        # -pi/2 to pi/2 range, in order to get correct value we must subtract angle
-        # corresponding to circle clope from pi/2
-
-        return (np.pi/2 - circle_slope_angle) - vane_slope_angle
+        return circle_slope_angle - vane_slope_angle
 
 
 @dataclass
@@ -116,14 +122,14 @@ class StraightVane(Vane):
         return np.zeros_like(radius)
 
     @overload
-    def slope(self, radius: float) -> float:
+    def derivative(self, radius: float) -> float:
         ...
 
     @overload
-    def slope(self, radius: NDArray[float64]) -> NDArray[float64]:
+    def derivative(self, radius: NDArray[float64]) -> NDArray[float64]:
         ...
 
-    def slope(self, radius):
+    def derivative(self, radius):
         return np.zeros_like(radius)
 
     def length(self, radius_array: NDArray[float64]) -> NDArray[float64]:
