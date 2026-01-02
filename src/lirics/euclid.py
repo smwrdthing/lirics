@@ -90,14 +90,15 @@ class Vane(ABC):
         return length*self.thickness
 
     @overload
-    def adjacent_angle(self, radius: float) -> float:
+    def adjacent_angle(self, radius: float, step: float = STEP) -> float:
         ...
 
     @overload
-    def adjacent_angle(self, radius: NDArray[float64]) -> NDArray[float64]:
+    def adjacent_angle(
+            self, radius: NDArray[float64], step: float = STEP) -> NDArray[float64]:
         ...
 
-    def adjacent_angle(self, radius):
+    def adjacent_angle(self, radius, step=STEP):
         """Computes angle between vane's tangent and circle's tangent for given radius."""
 
         vane_angle = self.equation(radius)
