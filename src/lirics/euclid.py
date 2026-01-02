@@ -175,7 +175,7 @@ class ArchVane(Vane):
                        self.arch_radius**2) /
                       (2*radius_after_transition*self.distance_to_arch_center)))
 
-        raise angle
+        return angle
 
     def compute_approximation_coeffs(self):
         """Computes coefficients for polynomial approximation of vane equation.
