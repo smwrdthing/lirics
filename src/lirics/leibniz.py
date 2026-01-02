@@ -37,3 +37,7 @@ def tabular_derivative(y: NDArray[float64], x: NDArray[float64]) -> NDArray[floa
 
 def time_derivative(y, prior_y, time_step):
     return (y-prior_y)/time_step
+
+
+def tabular_line_integral(path, components):
+    return np.sum(np.trapezoid(components, path))
