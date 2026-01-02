@@ -9,6 +9,8 @@ from numpy.typing import NDArray
 from numpy import float64
 import numpy as np
 
+from lirics.leibniz import function_derivative
+
 # TODO : type annotations in methods
 
 
@@ -39,11 +41,7 @@ class Vane(ABC):
     def slope(self, radius, step=0.5e-3):
         """Computes vane's midline slope for given radial coordinate with
         central finite difference approximation of derivative."""
-
-        left = self.equation(radius-step)
-        right = self.equation(radius+step)
-
-        return (right-left)/(2*step)
+        return function_derivative(self.equation, radius, step)
 
     def length(self, radius_range: NDArray[float64] | None = None) -> NDArray[float64]:
         """Computes length of vane's with numerical trapezoid integration over provided
