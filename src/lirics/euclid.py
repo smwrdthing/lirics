@@ -65,6 +65,14 @@ class Vane(ABC):
 
         return length*self.thickness
 
+    @overload
+    def adjacent_angle(self, radius: float) -> float:
+        ...
+
+    @overload
+    def adjacent_angle(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
+
     def adjacent_angle(self, radius):
         """Computes angle between vane's tangent and circle's tangent for given radius."""
 
@@ -82,8 +90,24 @@ class Vane(ABC):
 @dataclass
 class StraightVane(Vane):
 
+    @overload
+    def equation(self, radius: float) -> float:
+        ...
+
+    @overload
+    def equation(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
+
     def equation(self, radius):
         return np.zeros_like(radius)
+
+    @overload
+    def slope(self, radius: float) -> float:
+        ...
+
+    @overload
+    def slope(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     def slope(self, radius):
         return np.zeros_like(radius)
@@ -120,6 +144,14 @@ class ArchVane(Vane):
 
         self.distance_to_arch_center = np.sqrt(
             self.transition_radius**2+self.arch_radius**2)
+
+    @overload
+    def equation(self, radius: float) -> float:
+        ...
+
+    @overload
+    def equation(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     def equation(self, radius):
         angle = np.zeros_like(radius)
@@ -186,9 +218,19 @@ class Impeller:
 
         self.angular_width_of_cell = 2*np.pi/self.number_of_cells
 
-        self.total_area_of_cell = self.area_of_cell(
-            from_radius=self.hub_radius, to_radius=self.rim_radius)
-        self.total_volume_of_cell = self.total_area_of_cell*self.length
+        self.total_radius_range = np.linspace(
+            self.hub_radius, self.rim_radius, PARTITIONS)
+
+        self.total_area = self.area(self.total_radius_range)
+        self.total_volume = self.total_area*self.length
+
+    @overload
+    def clutter_coeff(self, radius: float) -> float:
+        ...
+
+    @overload
+    def clutter_coeff(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     def clutter_coeff(self, radius):
         """Computes cluttering coefficient for given radius to account for radial
@@ -229,7 +271,15 @@ class Impeller:
 
         return area*self.length
 
-    def area_of_radial_flow(self, radius):
+    @overload
+    def flow_area(self, radius: float) -> float64:
+        ...
+
+    @overload
+    def flow_area(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
+
+    def flow_area(self, radius):
         """Computes area of radial flow in the cell for given radius"""
 
         clutter_coeff = self.clutter_coeff(radius)
@@ -242,6 +292,14 @@ class Impeller:
 class Case(ABC):
 
     length: float
+
+    @overload
+    def equation(self, angle: float) -> float:
+        ...
+
+    @overload
+    def equation(self, angle: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     @abstractmethod
     def equation(self, angle):
@@ -276,6 +334,14 @@ class CircleCase(Case):
     excentricity: float
     radius: float
 
+    @overload
+    def equation(self, angle: float) -> float:
+        ...
+
+    @overload
+    def equation(self, angle: NDArray[float64]) -> NDArray[float64]:
+        ...
+
     def equation(self, angle):
 
         radius_vector = self.excentricity*np.cos(angle) + np.sqrt(
@@ -289,6 +355,14 @@ class EllipticCase(Case):
 
     major_semiaxis: float
     minor_semiaxis: float
+
+    @overload
+    def equation(self, angle: float) -> float:
+        ...
+
+    @overload
+    def equation(self, angle: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     def equation(self, angle):
 
