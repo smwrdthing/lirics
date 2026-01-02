@@ -14,7 +14,7 @@ def function_derivative(
 
 @overload
 def function_derivative(
-        func: Callable[[NDArray[float64], NDArray[float64]]],
+        func: Callable[[NDArray[float64]], NDArray[float64]],
         x: NDArray[float64], dx: float) -> NDArray[float64]:
     ...
 
