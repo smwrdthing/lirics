@@ -39,31 +39,25 @@ class Vane(ABC):
 
         return (right-left)/(2*step)
 
-    def length(self, from_radius=None, to_radius=None, partitions=100):
-        """Computes length of vane's bounded piece with numerical trapezoid integration
-        and specifeid number of partitions. If boundaries aren't provided total length is
-        computed."""
+    def length(self, radius_range: NDArray[float64] | None = None) -> NDArray[float64]:
+        """Computes length of vane's with numerical trapezoid integration over provided
+        array of radius values."""
 
-        if from_radius is None:
-            from_radius = self.start_radius
-        if to_radius is None:
-            to_radius = self.end_radius
+        if radius_range is None:
+            radius_range = self.total_radius_range
 
-        radius = np.linspace(from_radius, to_radius, partitions)
-        slope = self.slope(radius)
-
-        func = np.sqrt(1+radius**2*slope**2)
-
-        length = np.trapezoid(func, radius, axis=0)
+        slope = self.slope(radius_range)
+        func = np.sqrt(1+radius_range**2*slope**2)
+        length = np.trapezoid(func, radius_range, axis=0)
 
         return length
 
-    def area(self, from_radius=None, to_radius=None, partitions=100):
-        """Computes approximate area occupied by vane's bounded piece with numerical
-        trapezoid integration and specifeid number of partitions. Area is computeda as
-        length multiplied by thickness."""
+    def area(self, radius_range):
+        """Computes approximate area occupied by vane with trapezoid integration
+        over provided array of radius values. Area is computeda as length multiplied by
+        thickness."""
 
-        length = self.length(from_radius, to_radius, partitions)
+        length = self.length(radius_range)
 
         return length*self.thickness
 
