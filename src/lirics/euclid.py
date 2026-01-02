@@ -12,6 +12,8 @@ import numpy as np
 from lirics.leibniz import function_derivative
 
 # TODO : type annotations in methods
+STEP = 0.5e-3
+PARTITIONS = 100
 
 
 def circle_slope(angle):
@@ -48,7 +50,7 @@ class Vane(ABC):
         corresponds to given radius."""
         raise
 
-    def slope(self, radius, step=0.5e-3):
+    def slope(self, radius: NDArray[float64], step: float = STEP):
         """Computes vane's midline slope for given radial coordinate with
         central finite difference approximation of derivative."""
         return function_derivative(self.equation, radius, step)
@@ -66,12 +68,15 @@ class Vane(ABC):
 
         return length
 
-    def area(self, radius_range):
+    def area(self, radius_array: NDArray[float64] | None = None) -> NDArray[float64]:
         """Computes approximate area occupied by vane with trapezoid integration
         over provided array of radius values. Area is computeda as length multiplied by
         thickness."""
 
-        length = self.length(radius_range)
+        if radius_array is None:
+            radius_array = self.total_radius_range
+
+        length = self.length(radius_array)
 
         return length*self.thickness
 
@@ -122,14 +127,10 @@ class StraightVane(Vane):
     def slope(self, radius):
         return np.zeros_like(radius)
 
-    def length(self, from_radius=None, to_radius=None):
-
-        if from_radius is None:
-            from_radius = self.start_radius
-        if to_radius is None:
-            to_radius = self.end_radius
-
-        return to_radius - from_radius
+    def length(self, radius_array: NDArray[float64]) -> NDArray[float64]:
+        if radius_array is None:
+            radius_array = self.total_radius_range
+        return radius_array[-1]-radius_array[0]
 
     def adjacent_angle(self, radius):
         return np.pi/2*np.ones_like(radius)
@@ -208,25 +209,26 @@ class ArchVane(Vane):
 
 
 @dataclass
-class Impeller:
+class Cell:
 
     length: float
     hub_radius: float
     rim_radius: float
 
-    number_of_cells: float
+    amount: float
 
     vane: Vane
 
-    angular_width_of_cell: float = field(init=False)
-    total_area_of_cell: float = field(init=False)
-    total_volume_of_cell: float = field(init=False)
+    angular_width: float = field(init=False)
+    total_radius_range: NDArray[float64] = field(init=False)
+    total_area: NDArray[float64] = field(init=False)
+    total_volume: NDArray[float64] = field(init=False)
 
     def __post_init__(self):
         """Computes angular width of cell from number of cells, total cell area and total
         cell volume."""
 
-        self.angular_width_of_cell = 2*np.pi/self.number_of_cells
+        self.angular_width = 2*np.pi/self.amount
 
         self.total_radius_range = np.linspace(
             self.hub_radius, self.rim_radius, PARTITIONS)
@@ -247,37 +249,34 @@ class Impeller:
         flow area reduction due to the prescence of vanes."""
 
         adjacent_angle = self.vane.adjacent_angle(radius)
-        angular_width = self.angular_width_of_cell
+        angular_width = self.angular_width
         thickness = self.vane.thickness
 
         coeff = 1 - thickness/(angular_width*radius*np.sin(adjacent_angle))
 
         return coeff
 
-    def area_of_cell(self, from_radius=None, to_radius=None, partitions=100):
-        """Computes area of cell bounded by given radius values and
-        number of partitions."""
+    def area(self, radius_array: NDArray[float64] | None = None) -> NDArray[float64]:
+        """Computes area of cell with trapezoid integration over specified array of
+        radiuses."""
 
-        if from_radius is None:
-            from_radius = self.hub_radius
-        if to_radius is None:
-            to_radius = self.rim_radius
+        if radius_array is None:
+            radius_array = self.total_radius_range
 
-        radius = np.linspace(from_radius, to_radius, partitions)
-        func = 1/2*radius**2*self.angular_width_of_cell
-        pure_cell_area = np.trapezoid(func, radius, axis=0)
+        func = 1/2*radius_array**2*self.angular_width
+        pure_cell_area = np.trapezoid(func, radius_array, axis=0)
 
-        vane_area = self.vane.area(from_radius, to_radius, partitions)
+        vane_area = self.vane.area(radius_array)
 
         area = pure_cell_area - vane_area
 
         return area
 
-    def volume_of_cell(self, from_radius=None, to_radius=None, partitions=100):
+    def volume(self, radius_array: NDArray[float64]) -> NDArray[float64]:
         """Computes volume of cell bounded by given radius values and
         number of partitions."""
 
-        area = self.area_of_cell(from_radius, to_radius, partitions)
+        area = self.area(radius_array)
 
         return area*self.length
 
@@ -293,13 +292,13 @@ class Impeller:
         """Computes area of radial flow in the cell for given radius"""
 
         clutter_coeff = self.clutter_coeff(radius)
-        area = self.length*self.angular_width_of_cell*radius*clutter_coeff
+        area = self.length*self.angular_width*radius*clutter_coeff
 
         return area
 
 
 @dataclass
-class Case(ABC):
+class Frame(ABC):
 
     length: float
 
@@ -313,33 +312,33 @@ class Case(ABC):
 
     @abstractmethod
     def equation(self, angle):
-        """Represents case's equation, returns radius-vector length for given angle"""
+        """Represents frame's equation, returns radius-vector length for given angle"""
         raise
 
-    def area_of_sector(self, from_angle, to_angle, base_radius=0.0, partitions=100):
-        """Computes area of sector in case bounded by base radius and two angular
-        coordinates"""
+    def sector_area(self, angle_array: NDArray[float64],
+                    base_radius: float = 0.0) -> NDArray[float64]:
+        """Computes area of sector with trapezeoid integration over provided array of
+        angles, base radisu arch area is subtracted from integration results."""
 
-        angles = np.linspace(from_angle, to_angle, partitions)
-        case_radius_vector = self.equation(angles)
+        frame_radius_vector = self.equation(angle_array)
 
-        base_area = np.trapezoid(1/2*angles*base_radius**2, angles)
-        shape_area = np.trapezoid(1/2*angles*case_radius_vector**2, angles)
+        base_area = 1/2*angle_array*base_radius**2
+        shape_area = np.trapezoid(1/2*frame_radius_vector**2, angle_array)
 
         return shape_area - base_area
 
-    def volume_of_sector(self, from_angle, to_angle, base_radius=0.0, partitions=100):
-        """Computes volume of sector in case bounded by base radius and two angular
-        coordinates"""
+    def sector_volume(self, angle_range: NDArray[float64],
+                      base_radius: float = 0.0) -> NDArray[float64]:
+        """Computes volume of sector in frame with trapezoid integration over given array
+        of angles."""
 
-        area = self.area_of_sector(
-            from_angle, to_angle, base_radius, partitions)
+        area = self.sector_area(angle_range, base_radius)
 
         return area*self.length
 
 
 @dataclass
-class CircleCase(Case):
+class CircularFrame(Frame):
 
     excentricity: float
     radius: float
@@ -361,7 +360,7 @@ class CircleCase(Case):
 
 
 @dataclass
-class EllipticCase(Case):
+class EllipticFrame(Frame):
 
     major_semiaxis: float
     minor_semiaxis: float
