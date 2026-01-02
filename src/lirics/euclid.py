@@ -183,7 +183,7 @@ class Impeller:
     total_volume_of_cell: float = field(init=False)
 
     def __post_init__(self):
-        """Computes angular widthof cell from number of cells, total cell area and total
+        """Computes angular width of cell from number of cells, total cell area and total
         cell volume."""
 
         self.angular_width_of_cell = 2*np.pi/self.number_of_cells
