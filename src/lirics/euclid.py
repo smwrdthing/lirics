@@ -27,10 +27,20 @@ class Vane(ABC):
     thickness: float
 
     total_radius_range: NDArray[float64] = field(init=False)
+    angular_width: float = field(init=False)
 
     def __post_init__(self):
         self.total_radius_range = np.linspace(
-            self.start_radius, self.end_radius, NUMBER_OF_PARTITIONS)
+            self.start_radius, self.end_radius, PARTITIONS)
+        self.angular_width = self.equation(self.end_radius)
+
+    @overload
+    def equation(self, radius: float) -> float:
+        ...
+
+    @overload
+    def equation(self, radius: NDArray[float64]) -> NDArray[float64]:
+        ...
 
     @abstractmethod
     def equation(self, radius):
