@@ -211,7 +211,8 @@ class ArchVane(Vane):
         """Represents an approcimation of vane's equtaion with polynomial expression"""
 
         a, b, c = self.approximation_coeffs
-        angle = a + b*radius**2 + c*radius**4
+        angle = (a + b*radius**2 + c*radius**4)*(
+            radius > self.transition_radius)
 
         return angle
 
