@@ -162,6 +162,8 @@ class ArchVane(Vane):
         self.distance_to_arch_center = np.sqrt(
             self.transition_radius**2+self.arch_radius**2)
 
+        super().__post_init__()
+
     @overload
     def equation(self, radius: float) -> float:
         ...
