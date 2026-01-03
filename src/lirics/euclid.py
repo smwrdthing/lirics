@@ -155,6 +155,7 @@ class ArchVane(Vane):
     def __post_init__(self):
         """Computes arch radius and distance to arch center with parameters provided to
         initializer."""
+
         self.arch_radius = (
             (self.end_radius**2-self.transition_radius**2) /
             (2*self.end_radius*np.cos(self.end_adjacent_angle)))
