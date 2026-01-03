@@ -174,13 +174,12 @@ class ArchVane(Vane):
         angle = np.zeros_like(radius)
 
         after_transition = (radius >= self.transition_radius)
-        radius_after_transition = radius[after_transition]
 
-        angle[after_transition] = (
+        angle += after_transition*(
             np.arcsin(self.arch_radius/self.distance_to_arch_center) -
-            np.arccos((radius_after_transition**2 + self.distance_to_arch_center**2 -
+            np.arccos((radius**2 + self.distance_to_arch_center**2 -
                        self.arch_radius**2) /
-                      (2*radius_after_transition*self.distance_to_arch_center)))
+                      (2*radius*self.distance_to_arch_center)))
 
         return angle
 
