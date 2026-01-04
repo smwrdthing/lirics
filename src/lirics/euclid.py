@@ -455,14 +455,15 @@ def pave_total_path(
 
     up_partitions, side_partitions, down_partitions = path_partitions
 
-    vane_up = pave_vane_path(
-        vane, from_radius, vane.end_radius, up_partitions)
-    arch_side = pave_arch_path(
-        vane.end_radius, vane.angular_width, vane.angular_width+angular_shift)
-    vane_down = pave_vane_path(
-        vane, vane.end_radius, to_radius, angular_shift, up_partitions)
+    path_up = pave_vane_path(
+        vane, from_radius, vane.end_radius, partitions=up_partitions)
+    path_side = pave_arch_path(
+        vane.end_radius, vane.angular_width, vane.angular_width+angular_shift,
+        side_partitions)
+    path_down = pave_vane_path(
+        vane, vane.end_radius, to_radius, angular_shift, down_partitions)
 
-    total = np.vstack((vane_up, arch_side, vane_down))
+    total = np.hstack((path_up, path_side, path_down)).T
 
     return total
 
