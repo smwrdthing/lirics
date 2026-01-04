@@ -15,11 +15,6 @@ STEP = 0.5e-3
 PARTITIONS = 100
 
 
-def circle_slope(angle):
-    """Returns slope of circle for specified angle."""
-    return -np.cos(angle)/np.sin(angle)
-
-
 @dataclass
 class Vane(ABC):
 
