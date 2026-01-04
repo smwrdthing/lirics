@@ -10,6 +10,7 @@ from numpy import float64
 import numpy as np
 
 from lirics.leibniz import function_derivative
+from lirics.descartes import rotate_polar
 
 STEP = 0.5e-3
 PARTITIONS = 100
@@ -443,3 +444,23 @@ def arch_path(
     angle = np.linspace(from_angle, to_angle, partition)
 
     return np.ones_like(angle)*radius, angle
+
+
+def mesh_cell(cell: Cell, vane: Vane, mesh_shape: tuple[int, int]
+              ) -> tuple[NDArray[float64], NDArray[float64]]:
+    """Generate rectilinear mesh inside cell"""
+
+    row, col = mesh_shape
+    xi, eta = np.linspace(0, 1, row), np.linspace(0, 1, col)
+
+    xi, eta = np.meshgrid(xi, eta, indexing="ij")
+
+    radius = xi*(cell.rim_radius-cell.hub_radius)+cell.hub_radius
+    midline = vane.equation(radius[:, 0])  # any column will do
+
+    back = midline-cell.angular_width/2
+    front = midline+cell.angular_width/2
+
+    angle = np.transpose((front-back)*eta.T + back)
+
+    return radius, angle
