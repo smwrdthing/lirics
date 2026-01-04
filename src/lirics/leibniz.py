@@ -29,7 +29,7 @@ def tabular_derivative(y: NDArray[float64], x: NDArray[float64]) -> NDArray[floa
 
     # This is lighter than numpy's gradient, so it runs faster, thus retained.
     #
-    # For derivative along X just pass filed F and X grids as usual, for derivative
+    # For derivative along X just pass field F and X grids as usual, for derivative
     # along Y transpose inputs and transpose results back
     #
     # (just remember, this works with rows, thus all transpostitions)
