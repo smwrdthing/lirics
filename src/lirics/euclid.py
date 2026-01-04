@@ -425,7 +425,7 @@ def compute_total_sector_volume(
     return length*total_sector_area
 
 
-def vane_path(
+def pave_vane_path(
     vane: Vane, from_radius: float, to_radius: float,
     angular_shift: float = 0.0, partitions: int = PARTITIONS
 ) -> tuple[NDArray[float64], NDArray[float64]]:
@@ -436,7 +436,7 @@ def vane_path(
     return radius, angle
 
 
-def arch_path(
+def pave_arch_path(
     radius: float, from_angle: float, to_angle: float,
     partition: int = PARTITIONS
 ) -> tuple[NDArray[float64], NDArray[float64]]:
@@ -444,6 +444,27 @@ def arch_path(
     angle = np.linspace(from_angle, to_angle, partition)
 
     return np.ones_like(angle)*radius, angle
+
+
+def pave_total_path(
+        vane: Vane, from_radius: float, to_radius: float, angular_shift: float,
+        path_partitions: tuple[int, int, int] | None = None) -> NDArray[float64]:
+
+    if path_partitions is None:
+        path_partitions = (PARTITIONS, PARTITIONS, PARTITIONS)
+
+    up_partitions, side_partitions, down_partitions = path_partitions
+
+    vane_up = pave_vane_path(
+        vane, from_radius, vane.end_radius, up_partitions)
+    arch_side = pave_arch_path(
+        vane.end_radius, vane.angular_width, vane.angular_width+angular_shift)
+    vane_down = pave_vane_path(
+        vane, vane.end_radius, to_radius, angular_shift, up_partitions)
+
+    total = np.vstack((vane_up, arch_side, vane_down))
+
+    return total
 
 
 def mesh_cell(cell: Cell, vane: Vane, mesh_shape: tuple[int, int]
