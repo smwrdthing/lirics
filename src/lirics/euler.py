@@ -13,6 +13,11 @@ from lirics.leibniz import tabular_derivative, time_derivative, tabular_line_int
 @dataclass
 class VelocityField:
 
+    # NOTE (idea):
+    # Refactor VelocityField into something like FlowField. Generalisation encourages to
+    # move pressure-related computations into class. Then we can preform free-surface
+    # tracking here too, as everything  would be in place for this.
+
     radius: NDArray[float64]
     angle: NDArray[float64]
 
