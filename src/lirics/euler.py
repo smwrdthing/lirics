@@ -45,7 +45,7 @@ class FlowField:
     _interpolator_d_pressure_dr: LinearNDInterpolator = field(init=False)
     _interpolator_d_pressure_dphi: LinearNDInterpolator = field(init=False)
 
-    # This is needed because itherwise last path falls outside the domain
+    # This is needed because otherwise last path falls outside the domain
     _last_path_correction: float = field(default=np.deg2rad(0.05))
 
     def __post_init__(self):
