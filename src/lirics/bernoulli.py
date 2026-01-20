@@ -41,10 +41,10 @@ class FlowField:
             cell_flow.radial_velocity[-1, cell_flow._mid])
 
         # TODO : add pressure attribute to cell flow field
-        self.pressure[self._rim, self._back] = cell_flow.pressure[-1, 0]
+        self.pressure[self._rim, self._back] = cell_flow.rim_pressure[0]
         self.pressure[self._rim, self._mid] = (
-            cell_flow.pressure[-1, cell_flow._mid])
-        self.pressure[self._rim, self._front] = cell_flow.pressure[-1, -1]
+            cell_flow.rim_pressure[cell_flow._mid])
+        self.pressure[self._rim, self._front] = cell_flow.rim_pressure[-1]
 
     def compute_midline_paramters(self, prior_flow):
 
