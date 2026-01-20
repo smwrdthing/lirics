@@ -34,11 +34,11 @@ class FlowField:
     def adopt_boundary_parameters(self, cell_flow: euler.FlowField):
 
         self.tangent_velocity[self._rim, :] = (
-            cell_flow.tangent_component[-1, cell_flow._mid] +
+            cell_flow.tangent_velocity[-1, cell_flow._mid] +
             self.angular_velocity*cell_flow.radius[-1, cell_flow._mid])
 
         self.radial_velocity[self._rim, :] = (
-            cell_flow.radial_component[-1, cell_flow._mid])
+            cell_flow.radial_velocity[-1, cell_flow._mid])
 
         # TODO : add pressure attribute to cell flow field
         self.pressure[self._rim, self._back] = cell_flow.pressure[-1, 0]
