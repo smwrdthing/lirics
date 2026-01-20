@@ -27,6 +27,8 @@ class FlowField:
     radial_velocity: NDArray[float64] = field(init=False)
     tangent_velocity: NDArray[float64] = field(init=False)
 
+    pressure: NDArray[float64] = field(init=False)
+
     d_radial_dr: NDArray[float64] = field(init=False)
     d_radial_dt: NDArray[float64] = field(init=False)
 
