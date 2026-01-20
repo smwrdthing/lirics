@@ -27,7 +27,7 @@ class FlowField:
     radial_velocity: NDArray[float64] = field(init=False)
     tangent_velocity: NDArray[float64] = field(init=False)
 
-    pressure: NDArray[float64] = field(init=False)
+    rim_pressure: NDArray[float64] = field(init=False)
 
     d_radial_dr: NDArray[float64] = field(init=False)
     d_radial_dt: NDArray[float64] = field(init=False)
@@ -169,3 +169,6 @@ class FlowField:
             self.surface_radius.append(surface_radius)
             self.surface_angle.append(surface_angle)
         self.surface_angle[-1] -= self._last_path_correction
+
+    def compute_rim_pressure(self, vapor_pressure: float):
+        self.rim_pressure = np.array(self._rim_pressure_diffs)+vapor_pressure
