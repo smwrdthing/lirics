@@ -24,8 +24,8 @@ class FlowField:
     angular_velocity: float
     fluid_density: float
 
-    radial_component: NDArray[float64] = field(init=False)
-    tangent_component: NDArray[float64] = field(init=False)
+    radial_velocity: NDArray[float64] = field(init=False)
+    tangent_velocity: NDArray[float64] = field(init=False)
 
     d_radial_dr: NDArray[float64] = field(init=False)
     d_radial_dt: NDArray[float64] = field(init=False)
@@ -60,18 +60,18 @@ class FlowField:
 
         vane, cell = domain
 
-        self.radial_component = -flow/cell.flow_area(self.radius)
+        self.radial_velocity = -flow/cell.flow_area(self.radius)
 
-        self.tangent_component = (
-            self.radius * self.radial_component * vane.derivative(self.radius, step))
+        self.tangent_velocity = (
+            self.radius * self.radial_velocity * vane.derivative(self.radius, step))
 
     def compute_velocity_space_derivatives(self) -> None:
 
         self.d_radial_dr = tabular_derivative(
-            self.radial_component, self.radius)
+            self.radial_velocity, self.radius)
 
         self.d_tangent_dr = tabular_derivative(
-            self.tangent_component, self.radius)
+            self.tangent_velocity, self.radius)
 
     def compute_velocity_time_derivatives(
             self, prior_flow_field: FlowField) -> None:
@@ -79,10 +79,10 @@ class FlowField:
         time_step = self.time-prior_flow_field.time
 
         self.d_radial_dt = time_derivative(
-            self.radial_component, prior_flow_field.radial_component, time_step)
+            self.radial_velocity, prior_flow_field.radial_velocity, time_step)
 
         self.d_tangent_dt = time_derivative(
-            self.tangent_component, prior_flow_field.tangent_component, time_step)
+            self.tangent_velocity, prior_flow_field.tangent_velocity, time_step)
 
     def compute_pressure_derivatives(self):
 
@@ -90,7 +90,7 @@ class FlowField:
         density = self.fluid_density
         angular_velocity = self.angular_velocity
         radius, angle = self.radius, self.angle
-        vr, vt = self.radial_component, self.tangent_component
+        vr, vt = self.radial_velocity, self.tangent_velocity
         dvr_dt, dvt_dt = self.d_radial_dt, self.d_tangent_dt
         dvr_dr, dvt_dr = self.d_radial_dr, self.d_tangent_dr
 
