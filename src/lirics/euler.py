@@ -24,11 +24,10 @@ class FlowField:
     angular_velocity: float
     fluid_density: float
 
-    translation_velocity: float = field(init=False)
-
     radial_velocity: NDArray[float64] = field(init=False)
     tangent_velocity: NDArray[float64] = field(init=False)
-    pressure: NDArray[float64] = field(init=False)
+
+    rim_pressure: NDArray[float64] = field(init=False)
 
     d_radial_dr: NDArray[float64] = field(init=False)
     d_radial_dt: NDArray[float64] = field(init=False)
@@ -42,7 +41,7 @@ class FlowField:
     surface_radius: list[float] = field(init=False)
     surface_angle: list[float] = field(init=False)
 
-    mid: int = field(init=False)
+    _mid: int = field(init=False)
     angular_shifts: NDArray[float64] = field(init=False)
     _rim_pressure_diffs: list[float] = field(init=False)
     _interpolator_d_pressure_dr: LinearNDInterpolator = field(init=False)
@@ -54,12 +53,12 @@ class FlowField:
     def __post_init__(self):
         # we expect odd number of columns to capture midline, this is a convenience
         # variable for corresponding index
-        self.mid = (self.radius.shape[1]-1)//2
-        self.angular_shifts = self.angle[0, self.mid] - self.angle[0]
+        self._mid = (self.radius.shape[1]-1)//2
+        self.angular_shifts = self.angle[0, self._mid] - self.angle[0]
         self.angular_shifts[-1] += self._last_path_correction
 
         self.translation_velocity = (
-            self.angular_velocity*self.radius[-1, self.mid])
+            self.angular_velocity*self.radius[-1, self._mid])
 
     def compute_velocity_components(
             self, domain: tuple[Vane, Cell], flow: float, step=STEP) -> None:
@@ -173,3 +172,6 @@ class FlowField:
             self.surface_radius.append(surface_radius)
             self.surface_angle.append(surface_angle)
         self.surface_angle[-1] -= self._last_path_correction
+
+    def compute_rim_pressure(self, vapor_pressure: float):
+        self.rim_pressure = np.array(self._rim_pressure_diffs)+vapor_pressure

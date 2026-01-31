@@ -1,11 +1,11 @@
 from __future__ import annotations
+
+from numpy import float64
+from numpy.typing import NDArray
 from dataclasses import dataclass, field
 
 import numpy as np
-
-from typing import Literal
-from numpy import float64
-from numpy.typing import NDArray
+from scipy.constants import g as gravity
 
 from lirics import euler
 
@@ -17,32 +17,43 @@ class FlowField:
     angle: NDArray[float64]
     radius: NDArray[float64]
 
+    angular_velocity: float
     fluid_density: float
 
-    tangent_velocity: NDArray[float64] = field(init=False)
-    radial_velocity: NDArray[float64] = field(init=False)
-    pressure: NDArray[float64] = field(init=False)
+    radial_velocity: NDArray[float64]
+    tangent_velocity: NDArray[float64]
 
-    # For indexing convenience
-    back: Literal[0] = 0
-    mid: Literal[1] = 1
-    front: Literal[2] = 2
+    pressure: NDArray[float64]
 
-    def compute_flow(self, cell_flow: euler.FlowField, prior_flow: FlowField):
+    _back: int = field(default=0)
+    _mid: int = field(default=1)
+    _front: int = field(default=2)
+    _rim: int = field(default=0)
+    _wall: int = field(default=-1)
 
-        time_step = self.time - prior_flow.time
-        self.tangent_velocity = np.zeros_like(self.radius[:, self.mid])
-        self.pressure = np.zeros_like(self.radius[:, self.mid])
+    def adopt_boundary_parameters(self, cell_flow: euler.FlowField):
 
-        cell_mid = cell_flow.mid
+        self.tangent_velocity[self._rim, :] = (
+            cell_flow.tangent_velocity[-1, cell_flow._mid] +
+            self.angular_velocity*cell_flow.radius[-1, cell_flow._mid])
 
-        # TODO : figure this stuff out properly
-        #
-        # shift_layer_thickness = (
-        #     cell_flow.radial_velocity[-1, cell_mid]*time_step)
-        # layer_tangent_velocity = (cell_flow.tangent_velocity[-1, cell_mid] +
-        #                           cell_flow.translation_velocity)
-        # shift_pressure = (
-        #     cell_flow.pressure[-1, cell_mid] +
-        #     self.fluid_density*layer_tangent_velocity**2 * shift_layer_thickness /
-        #     (cell_flow.radius[-1, cell_mid] + shift_layer_thickness/2))
+        self.radial_velocity[self._rim, :] = (
+            cell_flow.radial_velocity[-1, cell_flow._mid])
+
+        # TODO : add pressure attribute to cell flow field
+        self.pressure[self._rim, self._back] = cell_flow.rim_pressure[0]
+        self.pressure[self._rim, self._mid] = (
+            cell_flow.rim_pressure[cell_flow._mid])
+        self.pressure[self._rim, self._front] = cell_flow.rim_pressure[-1]
+
+    def compute_midline_paramters(self, prior_flow):
+
+        # NOTE
+        # Maybe use numba's jit to avoid native loop overhead
+
+        for i in range(len(self.tangent_velocity)):
+            # loop here
+            pass
+
+    def propagate_parameters_to_boundaries(self):
+        pass
