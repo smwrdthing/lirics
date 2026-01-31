@@ -24,8 +24,11 @@ class FlowField:
     angular_velocity: float
     fluid_density: float
 
-    radial_component: NDArray[float64] = field(init=False)
-    tangent_component: NDArray[float64] = field(init=False)
+    translation_velocity: float = field(init=False)
+
+    radial_velocity: NDArray[float64] = field(init=False)
+    tangent_velocity: NDArray[float64] = field(init=False)
+    pressure: NDArray[float64] = field(init=False)
 
     d_radial_dr: NDArray[float64] = field(init=False)
     d_radial_dt: NDArray[float64] = field(init=False)
@@ -39,8 +42,8 @@ class FlowField:
     surface_radius: list[float] = field(init=False)
     surface_angle: list[float] = field(init=False)
 
-    _mid: int = field(init=False)
-    _angular_shifts: NDArray[float64] = field(init=False)
+    mid: int = field(init=False)
+    angular_shifts: NDArray[float64] = field(init=False)
     _rim_pressure_diffs: list[float] = field(init=False)
     _interpolator_d_pressure_dr: LinearNDInterpolator = field(init=False)
     _interpolator_d_pressure_dphi: LinearNDInterpolator = field(init=False)
@@ -51,27 +54,30 @@ class FlowField:
     def __post_init__(self):
         # we expect odd number of columns to capture midline, this is a convenience
         # variable for corresponding index
-        self._mid = (self.radius.shape[1]-1)//2
-        self._angular_shifts = self.angle[0, self._mid] - self.angle[0]
-        self._angular_shifts[-1] += self._last_path_correction
+        self.mid = (self.radius.shape[1]-1)//2
+        self.angular_shifts = self.angle[0, self.mid] - self.angle[0]
+        self.angular_shifts[-1] += self._last_path_correction
+
+        self.translation_velocity = (
+            self.angular_velocity*self.radius[-1, self.mid])
 
     def compute_velocity_components(
             self, domain: tuple[Vane, Cell], flow: float, step=STEP) -> None:
 
         vane, cell = domain
 
-        self.radial_component = -flow/cell.flow_area(self.radius)
+        self.radial_velocity = -flow/cell.flow_area(self.radius)
 
-        self.tangent_component = (
-            self.radius * self.radial_component * vane.derivative(self.radius, step))
+        self.tangent_velocity = (
+            self.radius * self.radial_velocity * vane.derivative(self.radius, step))
 
     def compute_velocity_space_derivatives(self) -> None:
 
         self.d_radial_dr = tabular_derivative(
-            self.radial_component, self.radius)
+            self.radial_velocity, self.radius)
 
         self.d_tangent_dr = tabular_derivative(
-            self.tangent_component, self.radius)
+            self.tangent_velocity, self.radius)
 
     def compute_velocity_time_derivatives(
             self, prior_flow_field: FlowField) -> None:
@@ -79,10 +85,10 @@ class FlowField:
         time_step = self.time-prior_flow_field.time
 
         self.d_radial_dt = time_derivative(
-            self.radial_component, prior_flow_field.radial_component, time_step)
+            self.radial_velocity, prior_flow_field.radial_velocity, time_step)
 
         self.d_tangent_dt = time_derivative(
-            self.tangent_component, prior_flow_field.tangent_component, time_step)
+            self.tangent_velocity, prior_flow_field.tangent_velocity, time_step)
 
     def compute_pressure_derivatives(self):
 
@@ -90,7 +96,7 @@ class FlowField:
         density = self.fluid_density
         angular_velocity = self.angular_velocity
         radius, angle = self.radius, self.angle
-        vr, vt = self.radial_component, self.tangent_component
+        vr, vt = self.radial_velocity, self.tangent_velocity
         dvr_dt, dvt_dt = self.d_radial_dt, self.d_tangent_dt
         dvr_dr, dvt_dr = self.d_radial_dr, self.d_tangent_dr
 
@@ -122,7 +128,7 @@ class FlowField:
         pressure_diff_up = tabular_line_integral(
             path, (d_pressure_dr_path, d_pressure_dphi_path))
 
-        for shift in self._angular_shifts:
+        for shift in self.angular_shifts:
             if shift == 0:
                 pressure_diff_arch = 0
             else:
@@ -153,7 +159,7 @@ class FlowField:
 
         self._prepare_surface_tracking(vane, from_radius)
 
-        for shift, pressure_diff in zip(self._angular_shifts, self._rim_pressure_diffs):
+        for shift, pressure_diff in zip(self.angular_shifts, self._rim_pressure_diffs):
             if shift == 0:
                 surface_radius = from_radius
             else:
