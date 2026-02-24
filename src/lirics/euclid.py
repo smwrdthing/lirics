@@ -480,7 +480,7 @@ def mesh_cell(cell: Cell, vane: Vane, mesh_shape: tuple[int, int]
     radius = xi*(cell.rim_radius-cell.hub_radius)+cell.hub_radius
     midline = vane.equation(radius[:, 0])  # any column will do
 
-    back = midline-cell.angular_width/2
+    back = midline-cell.angular_width/2  # type: ignore
     front = midline+cell.angular_width/2
 
     angle = np.transpose((front-back)*eta.T + back)
