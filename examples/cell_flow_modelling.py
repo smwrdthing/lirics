@@ -105,7 +105,7 @@ ax.set_xlabel("x [mm]")
 ax.set_ylabel("y [mm]")
 ax.plot(X, Y, "k", X.T, Y.T, "k", linewidth=0.5)
 cf = ax.contourf(X, Y, flow_field.d_pressure_dphi, levels=100)
-fig.colorbar(cf, label=r"p'$_r$ [Pa/rad]")
+fig.colorbar(cf, label=r"p'$_{\varphi}$ [Pa/rad]")
 
 # plotting
 fig, ax = plt.subplots()
