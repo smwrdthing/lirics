@@ -48,10 +48,10 @@ def pave_angular_path(
     return r, phi
 
 
-def pave_total_path(cell: ImpellerCell, start_points, stop_point):
+def pave_total_path(cell: ImpellerCell, start_point, stop_points):
 
-    r_start, phi_start = start_points
-    r_stop, phi_stop = start_points
+    r_start, phi_start = start_point
+    r_stop, phi_stop = stop_points
 
     r_rim, phi_rim = cell.rim_radius, cell.midline_angle(cell.rim_radius)
 
