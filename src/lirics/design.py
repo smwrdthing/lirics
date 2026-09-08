@@ -15,7 +15,7 @@ DR = 1e-3  # default differentioation step for functional derivative
 class ImpellerCell(ABC):
     '''Base class for representation of the liquid ring machine cell.
 
-    Attributes holds main dimensions:
+    Attributes hold main dimensions:
         > hub radius : rhub
         > rim radius : rrim
         > length : l
@@ -26,7 +26,9 @@ class ImpellerCell(ABC):
 
     Methods encapsulate some geometrical functions and calculations related to
     the cell.
-    '''
+
+    Specific cell description should be implemeted by inheriring base class
+    and implemeting phi(r) midline equation in dedicated method.'''
 
     rhub: float
     rrim: float
@@ -135,30 +137,68 @@ class ImpellerCell(ABC):
         return A
 
 
-@dataclass
-class Housing(ABC):
+class StraightImpellerCell(ImpellerCell):
+    '''Class representing cell with straight midline. This class re-implemets midline
+    equation so that it always returns array of zeros compliant with the shape of
+    provided radial coordinates array.'''
 
-    length: float
+    def phi(self, r):
+        return np.zeros_like(r)
 
-    @abstractmethod
-    def R(self, angle):
+
+class ArchImpellerCell(ImpellerCell):
+    '''Class representing cell with arch-shaped midline. Adds arch radius rarch attribute
+    used in the phi(r).'''
+
+    rarch: float
+
+    def phi(self, r):
         pass
 
 
 @dataclass
+class Housing(ABC):
+    '''Base class for representation of the liquid ring machine housing.
+
+    Attributes hold main dimensinos:
+        > length : L
+
+    Methods encapsulate some geometrical functions and calculations related to
+    the housing.
+
+    Specific housings should be implemeted by inheriting base class and implementing
+    R(alpha) function for the profile.'''
+
+    L: float
+
+    @abstractmethod
+    def R(self, alpha):
+        raise
+
+
+@dataclass
 class CylindricalHousing(Housing):
+    '''Class representing cylindrical housing of the single-acting liquid ring machine
+    with cylindircal housing. Adds excentricity attribute e used in the R(alpha)'''
 
-    excentricity: float
+    e: float
 
-    def R(self, angle):
+    def R(self, alpha):
         pass
 
 
 @dataclass
 class EllipticHousing(Housing):
+    '''Class representing elliptic housing of the double-acting liquid ring machine
+    with elliptic housing. Adds two additional attributes A and B for major and minor
+    semi-axes used in R(alpha)'''
 
-    major_semiaxis: float
-    minor_semiaxis: float
+    A: float
+    B: float
 
-    def R(self, angle):
-        pass
+    def R(self, alpha):
+        R = np.sqrt(
+            1 / (np.cos(alpha)**2/self.A**2 +
+                 np.sin(alpha)**2/self.B**2))
+
+        return R
