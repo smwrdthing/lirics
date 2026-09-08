@@ -1,4 +1,6 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
+
 import numpy as np
 from scipy.constants import g
 
@@ -19,11 +21,11 @@ class RotatingField:
 
     def __init__(
             self,
-            volume_of_liquid: float,
-            density: float,
-            angular_speed: float,
             cell: ImpellerCell,
-            shape: tuple[int, int]
+            shape: tuple[int, int],
+            VL: float,
+            rho: float,
+            omega: float
     ) -> None:
 
         self.V = cell.V
@@ -33,14 +35,14 @@ class RotatingField:
         self.VV = np.nan
         self.TV = np.nan
 
-        self.VL = volume_of_liquid
+        self.VL = VL
         self.VLinterface = np.nan
 
         # Considered flow is incompressible, so density "field" is constant
-        self.rho = density
+        self.rho = rho
 
         # Field exists in time and space
-        self.omega = angular_speed
+        self.omega = omega
         self.alpha = 0
         self.t = 0
         self.r, self.phi = grid.generate(cell, shape)
@@ -111,7 +113,7 @@ class RotatingField:
             )
         )
 
-    def capture_inteface(self, reference_radius):
+    def capture_inteface(self, rref):
         """Capture interface points in the cell for given refrence radius"""
 
         # We must solve multiple minimization problems for this to work
@@ -179,7 +181,11 @@ class RotatingField:
         # Also we must ensure robust surface tracking for this to work smoothly
 
 
-class StationaryField:
+class StationaryField(ABC):
+
+    # NOTE : maybe a usefull idea
+    #        we could precompute all points here with known step,
+    #        I wonder what prosprects this framework would open
 
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
 
@@ -188,27 +194,57 @@ class StationaryField:
         # middle, back and front, thus [0.0]*3 things
 
         # Sectors geometrical parameters
-        self.midline_dphi = cell.phi(cell.rrim)
+        self.dphi = cell.phi(cell.rrim)
         self.alpha = [0.0]*3
         self.r = cell.rhub
+        self.delta = cell.delta
         self.R = [0.0]*3  # sectors radial bounds
         self.S = [0.0]*3  # sectors radial span
-        self.housingR = housing.R
+        self.RH = housing.R
 
         # Flow parameters
         self.avPSI = [0.0]*3  # potential field contribution
         self.avW = [0.0]*3  # velocity contribution
+        self.Prim = [0.0]*3  # rim pressure
         self.avP = [0.0]*3  # pressure contribution
         self.avJ = [0.0]*3  # overall energy flux
 
-    def sector_geometry_bump(self, rotating_field: RotatingField):
+    @abstractmethod
+    def lamW(self):
+        raise
 
-        mid = rotating_field.omega * rotating_field.t + self.midline_dphi
-        half = self.beta/2
+    def lamP(self):
+        pass
+
+    def lamPsi(self):
+        pass
+
+    def lamJ(self):
+        pass
+
+    def avlamW3(self):
+        pass
+
+    def avlamWP(self):
+        pass
+
+    def avlamWPsi(self):
+        pass
+
+    def avlamWJ(self):
+        pass
+
+    def xi(self):
+        pass
+
+    def next(self, rotating_field: RotatingField):
+
+        mid = rotating_field.omega * rotating_field.t + self.dphi
+        half = self.delta/2
         self.alpha = [mid - half, mid, mid + half]
 
         for i, alpha in enumerate(self.alpha):
-            self.R[i] = self.housingR(alpha)
+            self.R[i] = self.RH(alpha)
             self.S[i] = self.R[i] - self.r
 
     def propagate(self):
@@ -219,3 +255,14 @@ class StationaryField:
             rotating_field: RotatingField,
             prior_field: StationaryField):
         pass
+
+
+# Some fresh ideas further
+
+
+class LinearStationaryFiled(StationaryField):
+    pass
+
+
+class QuadraticStationaryField(StationaryField):
+    pass
