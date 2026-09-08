@@ -12,6 +12,7 @@ def dfdx(func: Callable, x: Numeric, dx: Numeric) -> Numeric:
     """Represents functional numeric reivative. Accepts function of single
     argument as variable and computes derivative numerically with step dx over all valuse
     in x by means of central differencing"""
+
     return (func(x+dx)-func(x-dx))/(2*dx)
 
 
