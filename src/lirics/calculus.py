@@ -8,11 +8,11 @@ from typing import Callable
 type Numeric = float | NDArray
 
 
-def function_derivative(func: Callable, x: Numeric, dx: Numeric) -> Numeric:
+def dfdx(func: Callable, x: Numeric, dx: Numeric) -> Numeric:
     return (func(x+dx)-func(x-dx))/(2*dx)
 
 
-def tabular_derivative(y: NDArray, x: NDArray) -> NDArray:
+def dydx(y: NDArray, x: NDArray) -> NDArray:
 
     # For derivative along X pass field F and X grids as usual, for derivative
     # along Y transpose inputs and transpose results back because this works with rows
@@ -26,9 +26,9 @@ def tabular_derivative(y: NDArray, x: NDArray) -> NDArray:
     return dydx
 
 
-def time_derivative(y: Numeric, prior_y: Numeric, time_step: float) -> Numeric:
+def dydt(y: Numeric, prior_y: Numeric, time_step: float) -> Numeric:
     return (y-prior_y)/time_step
 
 
-def tabular_line_integral(path, components):
+def linetrapz(path, components):
     return np.sum(np.trapezoid(components, path))

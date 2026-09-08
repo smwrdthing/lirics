@@ -46,7 +46,7 @@ class RotatingField:
         self.r, self.phi = grid.generate(cell, shape)
 
         self.A = cell.duct_area(self.r)
-        self.dphidr = calculus.tabular_derivative(self.phi, self.r)
+        self.dphidr = calculus.dydx(self.phi, self.r)
 
         self.u = np.zeros_like(self.r)
         self.w = np.zeros_like(self.r)
@@ -82,8 +82,8 @@ class RotatingField:
     def dUdr(self):
         '''Determine spatial derivatives of the velocity field'''
 
-        self.dudr = calculus.tabular_derivative(self.u, self.r)
-        self.dwdr = calculus.tabular_derivative(self.w, self.r)
+        self.dudr = calculus.dydx(self.u, self.r)
+        self.dwdr = calculus.dydx(self.w, self.r)
 
     def gradP(self):
         '''Determine pressure gradien components from governing equation for fluid flow'''
