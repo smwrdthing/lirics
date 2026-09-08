@@ -64,7 +64,7 @@ class RotatingField:
         self.phi_interface = np.nan
 
     def U(self, prior_field: RotatingField):
-        '''Determine velocity field components'''
+        """Determine velocity field components"""
 
         dVL = self.VL - prior_field.VL
         dt = self.t - prior_field.t
@@ -73,20 +73,20 @@ class RotatingField:
         self.w = self.u * self.r * self.dphidr
 
     def dUdt(self, prior_field: RotatingField):
-        '''Determine temporal derivative of the velocity field'''
+        """Determine temporal derivative of the velocity field"""
 
         dt = self.t - prior_field.t
         self.dudt = (self.u - prior_field.u)/dt
         self.dwdt = (self.w - prior_field.w)/dt
 
     def dUdr(self):
-        '''Determine spatial derivatives of the velocity field'''
+        """Determine spatial derivatives of the velocity field"""
 
         self.dudr = calculus.dydx(self.u, self.r)
         self.dwdr = calculus.dydx(self.w, self.r)
 
     def gradP(self):
-        '''Determine pressure gradien components from governing equation for fluid flow'''
+        """Determine pressure gradien components from governing equation for fluid flow"""
 
         omega_t = self.omega * self.t
 
@@ -112,7 +112,7 @@ class RotatingField:
         )
 
     def capture_inteface(self, reference_radius):
-        '''Capture interface points in the cell for given refrence radius'''
+        """Capture interface points in the cell for given refrence radius"""
 
         # We must solve multiple minimization problems for this to work
         #
@@ -129,7 +129,7 @@ class RotatingField:
         pass
 
     def evaluate_liquid_volume(self):
-        '''Evaluate volume of liquid residing within a field'''
+        """Evaluate volume of liquid residing within a field"""
 
         # For this we must process surface points on domain boundaries correctly and
         # evaluate area of the domain occupied by liquid with Gauss's area formula
@@ -143,7 +143,7 @@ class RotatingField:
             prior_field: RotatingField,
             tol: float
     ):
-        '''Solve time step for provided new value of volume of liquid in field domain'''
+        """Solve time step for provided new value of volume of liquid in field domain"""
 
         self.VL = volume_of_liquid
         self.t = prior_field.t + time_step
