@@ -79,7 +79,7 @@ class RotatingField:
         self.dudt = (self.u - prior_field.u)/dt
         self.dwdt = (self.w - prior_field.w)/dt
 
-    def dUdx(self):
+    def dUdr(self):
         '''Determine spatial derivatives of the velocity field'''
 
         self.dudr = calculus.tabular_derivative(self.u, self.r)
@@ -149,7 +149,7 @@ class RotatingField:
         self.t = prior_field.t + time_step
 
         self.U(prior_field)
-        self.dUdx()
+        self.dUdr()
         self.dUdt(prior_field)
         self.gradP()
 
