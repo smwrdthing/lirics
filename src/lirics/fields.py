@@ -26,7 +26,7 @@ class RotatingField:
             shape: tuple[int, int]
     ) -> None:
 
-        self.V = cell.volume
+        self.V = cell.V
 
         # Vapor parameters?
         self.pV = np.nan
@@ -188,12 +188,12 @@ class StationaryField:
         # middle, back and front, thus [0.0]*3 things
 
         # Sectors geometrical parameters
-        self.midline_dphi = cell.midline_angle(cell.rim_radius)
+        self.midline_dphi = cell.phi(cell.rrim)
         self.alpha = [0.0]*3
-        self.r = cell.hub_radius
+        self.r = cell.rhub
         self.R = [0.0]*3  # sectors radial bounds
         self.S = [0.0]*3  # sectors radial span
-        self.housingR = housing.profile
+        self.housingR = housing.R
 
         # Flow parameters
         self.avPSI = [0.0]*3  # potential field contribution

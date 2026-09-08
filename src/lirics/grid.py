@@ -26,11 +26,11 @@ def generate(cell: ImpellerCell, shape: tuple[int, int]) -> tuple[NDArray, NDArr
     xi, eta = np.linspace(0, 1, row), np.linspace(0, 1, col)
     xi, eta = np.meshgrid(xi, eta, indexing="ij")
 
-    r = xi*(cell.rim_radius - cell.hub_radius) + cell.hub_radius
-    phi_mid = cell.midline_angle(r[:, 0])
+    r = xi*(cell.rrim - cell.rhub) + cell.rhub
+    phi_mid = cell.phi(r[:, 0])
 
-    phi_back = phi_mid - cell.angular_width/2
-    phi_front = phi_mid + cell.angular_width/2
+    phi_back = phi_mid - cell.delta/2
+    phi_front = phi_mid + cell.delta/2
 
     phi = np.transpose((phi_front - phi_back)*eta.T+phi_back)
 
@@ -47,8 +47,8 @@ def pave_radial_path(
     of stopping point is not used."""
 
     r = np.linspace(start[_R_IDX], stop[_R_IDX], n)
-    dphi = start[_PHI_IDX]-cell.midline_angle(start[_R_IDX])  # angular shift
-    phi = cell.midline_angle(r) + dphi
+    dphi = start[_PHI_IDX]-cell.phi(start[_R_IDX])  # angular shift
+    phi = cell.phi(r) + dphi
 
     return r, phi
 
@@ -89,12 +89,12 @@ def pave_total_path(
     Intermediate points on the rim of the cell are constructed and handled internally.
     """
 
-    dphi_start = start[_PHI_IDX] - cell.midline_angle(start[_R_IDX])
-    dphi_stop = stop[_PHI_IDX] - cell.midline_angle(stop[_R_IDX])
+    dphi_start = start[_PHI_IDX] - cell.phi(start[_R_IDX])
+    dphi_stop = stop[_PHI_IDX] - cell.phi(stop[_R_IDX])
 
-    r_rim = cell.rim_radius
-    rim_start = (r_rim, cell.midline_angle(r_rim) + dphi_start)
-    rim_stop = (r_rim, cell.midline_angle(r_rim) + dphi_stop)
+    r_rim = cell.rrim
+    rim_start = (r_rim, cell.phi(r_rim) + dphi_start)
+    rim_stop = (r_rim, cell.phi(r_rim) + dphi_stop)
 
     up = pave_radial_path(cell, start, rim_start)
     side = pave_angular_path(rim_start, rim_stop)
