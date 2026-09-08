@@ -9,13 +9,31 @@ type Numeric = float | NDArray
 
 
 def dfdx(func: Callable, x: Numeric, dx: Numeric) -> Numeric:
+    """Represents functional numeric reivative. Accepts function of single
+    argument as variable and computes derivative numerically with step dx over all valuse
+    in x by means of central differencing"""
     return (func(x+dx)-func(x-dx))/(2*dx)
 
 
 def dydx(y: NDArray, x: NDArray) -> NDArray:
+    """Numerical derivative over (y,x) arrays. Derivative dy/dx is computed with second
+    order scheme, for internal array poins tcentral differencing utillized, boundary
+    points derivative are computed with special second order scheme.
 
-    # For derivative along X pass field F and X grids as usual, for derivative
-    # along Y transpose inputs and transpose results back because this works with rows
+    For further details on boundary points derivatives computation refer to:
+        "Computational Fluid Dynamics : The Basics With Applications"
+                                                   by J. D. Anderson
+
+    Handles numerical partial derivatives over 2D filed F(X,Y) as well.
+        > For partial derivative of F wrt X pass F as y and X as x:
+            dFdx = dydx(F,X)
+
+        > For partial derivative of F wrt Y pass F.T as y and Y.T as x AND transpose
+          returned array:
+            dFdy = dydx(F.T,Y.T).T
+
+    Transposition is required in the second case because internally "x" is assumed
+    to cahnge along rows"""
 
     dydx = np.zeros_like(x)
 
@@ -26,9 +44,11 @@ def dydx(y: NDArray, x: NDArray) -> NDArray:
     return dydx
 
 
-def dydt(y: Numeric, prior_y: Numeric, time_step: float) -> Numeric:
-    return (y-prior_y)/time_step
-
-
 def linetrapz(path, components):
+    """Calculates line integral of vector field with trapezoid rule.
+
+    For integral(P(x,y)*dx + Q(x,y)*dy + ...) calculation like that is basically
+    reduced to simple call np.sum call over arrays of integrals computed with
+    np.trapezoid for each component (P,Q,...) and corresponding path (x,y,...)"""
+
     return np.sum(np.trapezoid(components, path))
