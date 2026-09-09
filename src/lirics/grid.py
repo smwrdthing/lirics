@@ -20,7 +20,7 @@ NUM_OF_PATH_POINTS: int = 50
 def generate(cell: ImpellerCell, shape: tuple[int, int]) -> tuple[NDArray, NDArray]:
     """Generates rectilinear grid in (r,phi) coordinates representing internals of the
     cell. Generated grid is bounded between shiftet cell midlines coincident with ongoing
-    and runaway vanes of the impeller, real vane walls profiles are not accounted for"""
+    and runaway vanes of the impeller, real walls of the vane are neglected."""
 
     row, col = shape
     xi, eta = np.linspace(0, 1, row), np.linspace(0, 1, col)
@@ -42,9 +42,9 @@ def pave_radial_path(
         start: polarCoordinates,
         stop: polarCoordinates,
         n=NUM_OF_PATH_POINTS) -> tuple[Numeric, Numeric]:
-    """Generates (r,phi) points conformal to (shifted) cell midline. Shifting is handled
-    internally by means of provided starting point polar coordinates, angular coordinate
-    of stopping point is not used."""
+    """Generates (r,phi) points conformal to (shifted) cell midline.
+    Shifting is handled internally by means of the provided start point in polar
+    coordinates, angular coordinate of stop point is not used."""
 
     r = np.linspace(start[_R_IDX], stop[_R_IDX], n)
     dphi = start[_PHI_IDX]-cell.phi(start[_R_IDX])  # angular shift
@@ -57,16 +57,10 @@ def pave_angular_path(
         start: polarCoordinates,
         stop: polarCoordinates,
         n=NUM_OF_PATH_POINTS) -> tuple[Numeric, Numeric]:
-    """Generates (r,phi) points conformal to arch. Arch radius is read from starting
-    point, stopping point radius is not used"""
+    """Generates (r,phi) points conformal to arch. Arch radius is read from start
+    point, stop point radius is not used."""
 
-    if start[_PHI_IDX] is None or stop[_PHI_IDX] is None:
-        raise ValueError(
-            "Angular coordinate of points must be specified for this function")
-
-    # NOTE Pylance complains despite the check above, should figure out how to mitigate.
-    #      Ideally we don't want type checks, this is python, after all
-    #      (it is alwayas such a major headache to write types when numpy is involved...)
+    # NOTE : fix pylance typing complaints issue
     phi = np.linspace(start[_PHI_IDX], stop[_PHI_IDX], n)  # do not silence!
     r = np.ones_like(phi)*start[_R_IDX]
 
@@ -81,13 +75,12 @@ def pave_total_path(
                                    NUM_OF_PATH_POINTS,
                                    NUM_OF_PATH_POINTS)):
     """Generates total integration path needed for interface reconstruction in the cell
-    of liquid ring machine with start and stop points in polar coordinates.
+    of the liquid ring machine with start and stop points in polar coordinates.
 
     Function is implemented in the general manner, but actual usage should be confined to
-    cases with starting point residing on the midline of the cell.
+    cases with start point residing on the midline of the cell.
 
-    Intermediate points on the rim of the cell are constructed and handled internally.
-    """
+    Intermediate points on the rim of the cell are constructed and handled internally."""
 
     dphi_start = start[_PHI_IDX] - cell.phi(start[_R_IDX])
     dphi_stop = stop[_PHI_IDX] - cell.phi(stop[_R_IDX])
@@ -100,7 +93,7 @@ def pave_total_path(
     side = pave_angular_path(rim_start, rim_stop)
     down = pave_radial_path(cell, rim_stop, stop)
 
-    # NOTE Pylance comlains, reasons are the same as in function above
+    # NOTE : fix pylance typing complaints issue
     path = np.vstack((up, side, down))
 
     return path

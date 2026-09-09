@@ -18,6 +18,30 @@ ANY = -1
 
 
 class RotatingField:
+    """Class for representation of the flow filed in the impeller cell of the
+    liquid ring machine.
+
+    Field class handles flow field-related data management and is responsible for
+    cell flow resolution for the next spatio-temporal step of the modelling procedure
+    (for the next moment in time when cell moves to the next angular position).
+
+    Attributes of the calss hold:
+        > current time : t
+        > current angular position of the domain : alpha
+        > rotational velocity of the domain : omega 
+        > overall flow domain volume : V
+        > volume of the domain occupied with liquid : VL
+        > volume of the domain occupied with vapor : VP
+        > vapor pressure in the domain : pV
+        > vapor temperature in the domain : TV
+        > fluid density : rho
+        > grid points : (r,phi)
+        > velocity field : (u,w)
+        > velocity field temporal derivatives : (dudt,dwdt)
+        > velocity field spatial derivatives : (dudr,dwdr)
+        > pressure "gradient" : (dpdr,dpdphi)
+
+    """
 
     def __init__(
             self,
@@ -66,7 +90,9 @@ class RotatingField:
         self.phi_interface = np.nan
 
     def U(self, prior_field: RotatingField):
-        """Determine velocity field components"""
+        """Calculates velocity field components with volumetric flow rate computed
+        from backward derivative approximation for liquid volume and cell midline
+        tangency assumption."""
 
         dVL = self.VL - prior_field.VL
         dt = self.t - prior_field.t
@@ -75,20 +101,23 @@ class RotatingField:
         self.w = self.u * self.r * self.dphidr
 
     def dUdt(self, prior_field: RotatingField):
-        """Determine temporal derivative of the velocity field"""
+        """Calclates temporal derivative of the velocity field with backward approximation
+        of the dreivative and prior spatio-temporal field."""
 
         dt = self.t - prior_field.t
         self.dudt = (self.u - prior_field.u)/dt
         self.dwdt = (self.w - prior_field.w)/dt
 
     def dUdr(self):
-        """Determine spatial derivatives of the velocity field"""
+        """Calculates spatial derivatives of the velocity field numerically
+        on the grid (r,phi)."""
 
         self.dudr = calculus.dydx(self.u, self.r)
         self.dwdr = calculus.dydx(self.w, self.r)
 
     def gradP(self):
-        """Determine pressure gradien components from governing equation for fluid flow"""
+        """Calculates pressure "gradient" from the governing equation for incompressibel,
+        inviscid fluid flow in the uniformly rotating frame of reference."""
 
         omega_t = self.omega * self.t
 
@@ -114,7 +143,12 @@ class RotatingField:
         )
 
     def capture_inteface(self, rref):
-        """Capture interface points in the cell for given refrence radius"""
+        """Captures interface points in the cell for given refrence radius.
+
+        Capturing is formulated as a search of (r,phi) points where pressure
+        difference relative to the refernce point turns into zero along
+        reference-to-rim-and-back paths. Algorithm solves multiple rootfinding
+        problems for each angular shift relative to the midline on the grid."""
 
         # We must solve multiple minimization problems for this to work
         #
@@ -127,11 +161,15 @@ class RotatingField:
         # Then write points. Use them to evaluate volume of fluid, solve cell flow for
         # different reference radiuses until new given VL and evaluated volume of fluid
         # match within required tolerance
+        #
+        # Should restrict this to grid points shifts, general arbitrary interpolation on
+        # the rectilinear grid is possible (and is implemented in other branch),
+        # but I doubt that it is practical
 
         pass
 
     def evaluate_liquid_volume(self):
-        """Evaluate volume of liquid residing within a field"""
+        """Evaluate volume of liquid residing within a field."""
 
         # For this we must process surface points on domain boundaries correctly and
         # evaluate area of the domain occupied by liquid with Gauss's area formula
@@ -141,11 +179,11 @@ class RotatingField:
     def solve(
             self,
             volume_of_liquid: float,
-            time_step: float,
             prior_field: RotatingField,
+            time_step: float,
             tol: float
     ):
-        """Solve time step for provided new value of volume of liquid in field domain"""
+        """Solve flow field for the next spatio-temporal state of the domain."""
 
         self.VL = volume_of_liquid
         self.t = prior_field.t + time_step

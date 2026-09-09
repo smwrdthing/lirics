@@ -9,17 +9,18 @@ type Numeric = float | NDArray
 
 
 def dfdx(func: Callable, x: Numeric, dx: Numeric) -> Numeric:
-    """Represents functional numeric reivative. Accepts function of single
-    argument as variable and computes derivative numerically with step dx over all valuse
-    in x by means of central differencing"""
+    """Represents functional numeric derivative. Accepts function of single argument
+    as a variable and computes derivative numerically with step dx over all x values
+    by means of central differencing."""
 
     return (func(x+dx)-func(x-dx))/(2*dx)
 
 
 def dydx(y: NDArray, x: NDArray) -> NDArray:
-    """Numerical derivative over (y,x) arrays. Derivative dy/dx is computed with second
-    order scheme, for internal array poins tcentral differencing utillized, boundary
-    points derivative are computed with special second order scheme.
+    """Numerical derivative over (y,x) arrays. Derivative dy/dx is computed with the
+    second order scheme, for internal array points central differencing utillized,
+    boundary points in the arrays are treated separately to maintin second oreder
+    accuracy when central differencing is not applicable.
 
     For further details on boundary points derivatives computation refer to:
         "Computational Fluid Dynamics : The Basics With Applications"
@@ -34,7 +35,7 @@ def dydx(y: NDArray, x: NDArray) -> NDArray:
             dFdy = dydx(F.T,Y.T).T
 
     Transposition is required in the second case because internally "x" is assumed
-    to cahnge along rows"""
+    to cahnge along rows."""
 
     dydx = np.zeros_like(x)
 
@@ -46,10 +47,17 @@ def dydx(y: NDArray, x: NDArray) -> NDArray:
 
 
 def linetrapz(path, components):
-    """Calculates line integral of vector field with trapezoid rule.
+    """Calculates line integral of vector field with trapezoid rule. Hadles
+    integrals of the expressions in the following form:
 
-    For integral(P(x,y)*dx + Q(x,y)*dy + ...) calculation like that is basically
-    reduced to simple call np.sum call over arrays of integrals computed with
-    np.trapezoid for each component (P,Q,...) and corresponding path (x,y,...)"""
+        f0(x0,x1,...,xn)*dx0 + f1(x0,x1,...,xn)*dx1 + ... fn(x0,x1,...,xn)*dxn
+
+    Supports multidimensional vector fields. Theoretically. Though practical application
+    in this codebase is limited to 2D case only.
+    """
+
+    # For integral(P(x,y)*dx + Q(x,y)*dy + ...) calculation like this is reduced
+    # to simple call to np.sum over arrays of integrals computed with
+    # np.trapezoid for each component (P,Q,...) and corresponding path (x,y,...)
 
     return np.sum(np.trapezoid(components, path))

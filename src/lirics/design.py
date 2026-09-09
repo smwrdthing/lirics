@@ -8,12 +8,12 @@ from lirics import transform
 from lirics import calculus
 
 
-DR = 1e-3  # default differentioation step for functional derivative
+DR = 1e-3  # default step for functional numeric derivative
 
 
 @dataclass
 class ImpellerCell(ABC):
-    '''Base class for representation of the liquid ring machine cell.
+    """Base class for representation of the liquid ring machine cell.
 
     Attributes hold main dimensions:
         > hub radius : rhub
@@ -24,11 +24,10 @@ class ImpellerCell(ABC):
         > total area : A
         > total volume : V
 
-    Methods encapsulate some geometrical functions and calculations related to
-    the cell.
+    Methods encapsulate functions performing calculations related to the cell geometry.
 
-    Specific cell description should be implemeted by inheriring base class
-    and implemeting phi(r) midline equation in dedicated method.'''
+    Specific cell description should be implemeted by inheriting base class and
+    implemeting midline equation method phi(r) in dedicated method."""
 
     rhub: float
     rrim: float
@@ -49,9 +48,9 @@ class ImpellerCell(ABC):
         raise
 
     def theta(self, r, dr=DR) -> np.ndarray:
-        '''Computes and returns numeric value of anlge of the cell midline tangent line.
+        """Computes and returns numeric value of anlge of the cell midline tangent line.
         Not common in literature. Computations are preformed in the usual manner for
-        general parametric curve with radial coordinates being the parameter'''
+        general parametric curve with radial coordinates being the parameter"""
 
         phi = self.phi(r)
 
@@ -70,7 +69,7 @@ class ImpellerCell(ABC):
     def beta(self, r) -> np.ndarray:
         """Represents angle between tangents line of cell midline and circle of given
         raidus. For rim radius this quantity is usually denoted in the literature as
-        beta_2. Returns numeric value of this angle for given radial coordinate"""
+        beta2. Returns numeric value of this angle for given radial coordinate"""
 
         # From geometric consideration beta is basically phi_mid + pi/2 - theta
         # where theta is an angle of the tangent line to cell midline
@@ -80,8 +79,8 @@ class ImpellerCell(ABC):
         return beta
 
     def midline_length(self, r: np.ndarray):
-        """Computes and returns length of cell midline. Computation is
-        performed as follows:
+        """Computes and returns length of cell qmidline. Computation is performed
+        as follows:
 
             > radial coordinates array r is used to compute corresponding cell
               midline angles array phi
@@ -91,7 +90,7 @@ class ImpellerCell(ABC):
               curve length considering r as a parameter
 
         Integration is carried with trapezoid rule, for further details refer to
-        numpy.trapezoid"""
+        numpy.trapezoid function."""
 
         # Expecting r as an array here eliminates tedious processing of
         # integration boundaries definition, arrays generation etc etc
@@ -118,10 +117,10 @@ class ImpellerCell(ABC):
 
         return l
 
-    # NOTE thsi dr passing gets annoying really fast, probably should find workaround
+    # NOTE this dr passing gets annoying really fast, probably should find workaround
     def mu(self, r, dr=DR):
-        """Computes and returns cell cluttering coefficient caused by finitness
-        of vanes occupying cell space"""
+        """Computes and returns cell cluttering coefficient accounting for the finitness
+        of vanes thickness inside the cell."""
 
         mu = 1 - self.s / self.delta / \
             np.sin(self.theta(r, dr))
@@ -129,8 +128,8 @@ class ImpellerCell(ABC):
         return mu
 
     def duct_area(self, r):
-        '''Computes and returns duct area (area of the radial flow in the cell) for given
-        radial coordinate r'''
+        """Computes and returns cross-area of the radial flow in the cell for given
+        radial coordinate r."""
 
         A = self.l * self.delta * r * self.mu(r)
 
@@ -138,17 +137,17 @@ class ImpellerCell(ABC):
 
 
 class StraightImpellerCell(ImpellerCell):
-    '''Class representing cell with straight midline. This class re-implemets midline
-    equation so that it always returns array of zeros compliant with the shape of
-    provided radial coordinates array.'''
+    """Class representing cell with straight midline. This class re-implemets midline
+    equation so that it always returns array of zeros compliant with the shape of the
+    provided radial coordinates array r."""
 
     def phi(self, r):
         return np.zeros_like(r)
 
 
 class ArchImpellerCell(ImpellerCell):
-    '''Class representing cell with arch-shaped midline. Adds arch radius rarch attribute
-    used in the phi(r).'''
+    """Class representing cell with arch-shaped midline. Adds arch radius rarch attribute
+    used in the phi(r)."""
 
     rarch: float
 
@@ -158,7 +157,7 @@ class ArchImpellerCell(ImpellerCell):
 
 @dataclass
 class Housing(ABC):
-    '''Base class for representation of the liquid ring machine housing.
+    """Base class for representation of the liquid ring machine housing.
 
     Attributes hold main dimensinos:
         > length : L
@@ -167,7 +166,7 @@ class Housing(ABC):
     the housing.
 
     Specific housings should be implemeted by inheriting base class and implementing
-    R(alpha) function for the profile.'''
+    R(alpha) function for the profile."""
 
     L: float
 
@@ -178,8 +177,8 @@ class Housing(ABC):
 
 @dataclass
 class CylindricalHousing(Housing):
-    '''Class representing cylindrical housing of the single-acting liquid ring machine
-    with cylindircal housing. Adds excentricity attribute e used in the R(alpha)'''
+    """Class representing cylindrical housing of the single-acting liquid ring machine.
+    Adds excentricity attribute e used in the R(alpha)."""
 
     e: float
 
@@ -189,9 +188,8 @@ class CylindricalHousing(Housing):
 
 @dataclass
 class EllipticHousing(Housing):
-    '''Class representing elliptic housing of the double-acting liquid ring machine
-    with elliptic housing. Adds two additional attributes A and B for major and minor
-    semi-axes used in R(alpha)'''
+    """Class representing elliptic housing of the double-acting liquid ring machine.
+    Adds additional attributes A and B for major and minor semi-axes used in R(alpha)."""
 
     A: float
     B: float
