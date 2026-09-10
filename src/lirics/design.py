@@ -172,18 +172,38 @@ class Housing(ABC):
 
     @abstractmethod
     def R(self, alpha):
+        """Represents housing profile equation. Returns radius-vector length for given
+        rotational angle.Rotational angle is seeded from x-axis.
+
+        Chosen generic coordinate system is aligned as follows:
+            x-axis passes throguh location corresponding to max. vapor volume in the cell
+            y-axis is oritned from intake port to discharge port
+
+        Coordinate system alignment must be considered for proper implementation of
+        R-function for specific housings."""
+
         raise
 
 
 @dataclass
 class CylindricalHousing(Housing):
     """Class representing cylindrical housing of the single-acting liquid ring machine.
-    Adds excentricity attribute e used in the R(alpha)."""
+    Adds excentricity and cylinder radius attributes e and Rc used in the R(alpha)."""
 
     e: float
+    Rc: float
 
     def R(self, alpha):
-        pass
+        """Represents cylindrical housing equation. Derivation is based on triangle
+        formed by radius-vector, cylindrincal housing radius and straight line connecting
+        centers of housing and impeller. Relationship between sides of such triangle
+        leads to quadratic equatino in R. Solution of this equation and selection of
+        physically sensibel root leads to implemented equation:"""
+
+        R = self.e*np.sqrt(alpha) + np.sqrt(
+            self.Rc**2 - self.e*(1-np.cos(alpha)**2))
+
+        return R
 
 
 @dataclass
@@ -195,6 +215,10 @@ class EllipticHousing(Housing):
     B: float
 
     def R(self, alpha):
+        """Represents elliptic housing equation. Derived from canonical equation of the
+        ellipse by substitution of Cartesian-to-polar transformation equations, such
+        substitution allows then to express R(alpha)."""
+
         R = np.sqrt(
             1 / (np.cos(alpha)**2/self.A**2 +
                  np.sin(alpha)**2/self.B**2))
