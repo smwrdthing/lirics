@@ -225,6 +225,26 @@ class StationaryField(ABC):
     #        we could precompute all points here with known step,
     #        I wonder what prosprects this framework would open
 
+    # NOTE : insight
+    #        Cubic equation in average velocity is possible to derive,
+    #        but not in the form I was expecting before
+    #
+    #        lamP does not automatically follows from lamW, but it is
+    #        possible to express lamP*lamW via quantities which
+    #        are defined by fixed lamW. This leads to cubic equation
+    #        in average W.
+    #
+    #        I still have some concerns on coupling and consistency
+    #        of fixing lamW. For example fixed linear profile makes
+    #        no sense for straight cells, because average velocity
+    #        is instantly defined by tangent velocity on the rim, which
+    #        is constant, so we get constant average velocity across
+    #        sections automatically.
+    #
+    #        Day was long, I guesse I just need to sleep on this,
+    #        one happy sunny day I will defend this PhD and rest
+    #        calmly
+
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
 
         # We hold parameters for three radial sections for calculations
@@ -250,6 +270,9 @@ class StationaryField(ABC):
     @abstractmethod
     def lamW(self):
         raise
+
+    def lamCF(self):
+        pass
 
     def lamP(self):
         pass
