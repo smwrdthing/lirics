@@ -28,7 +28,7 @@ class RotatingField:
     Attributes of the calss hold:
         > current time : t
         > current angular position of the domain : alpha
-        > rotational velocity of the domain : omega 
+        > rotational velocity of the domain : omega
         > overall flow domain volume : V
         > volume of the domain occupied with liquid : VL
         > volume of the domain occupied with vapor : VP
@@ -89,24 +89,24 @@ class RotatingField:
         self.r_interface = np.nan
         self.phi_interface = np.nan
 
-    def U(self, prior_field: RotatingField):
+    def U(self, prior: RotatingField):
         """Calculates velocity field components with volumetric flow rate computed
         from backward derivative approximation for liquid volume and cell midline
         tangency assumption."""
 
-        dVL = self.VL - prior_field.VL
-        dt = self.t - prior_field.t
+        dVL = self.VL - prior.VL
+        dt = self.t - prior.t
 
         self.u = - 1 / self.A * dVL / dt
         self.w = self.u * self.r * self.dphidr
 
-    def dUdt(self, prior_field: RotatingField):
+    def dUdt(self, prior: RotatingField):
         """Calclates temporal derivative of the velocity field with backward approximation
         of the dreivative and prior spatio-temporal field."""
 
-        dt = self.t - prior_field.t
-        self.dudt = (self.u - prior_field.u)/dt
-        self.dwdt = (self.w - prior_field.w)/dt
+        dt = self.t - prior.t
+        self.dudt = (self.u - prior.u)/dt
+        self.dwdt = (self.w - prior.w)/dt
 
     def dUdr(self):
         """Calculates spatial derivatives of the velocity field numerically
@@ -179,18 +179,18 @@ class RotatingField:
     def solve(
             self,
             volume_of_liquid: float,
-            prior_field: RotatingField,
+            prior: RotatingField,
             time_step: float,
             tol: float
     ):
         """Solve flow field for the next spatio-temporal state of the domain."""
 
         self.VL = volume_of_liquid
-        self.t = prior_field.t + time_step
+        self.t = prior.t + time_step
 
-        self.U(prior_field)
+        self.U(prior)
         self.dUdr()
-        self.dUdt(prior_field)
+        self.dUdt(prior)
         self.gradP()
 
         # we can use prior field surface position for initial guesse
