@@ -38,6 +38,15 @@ class ImpellerCell(ABC):
     A: float = field(init=False)
     V: float = field(init=False)
 
+    def __post_init__(self):
+
+        n_vol_integration = round((self.rrim-self.rhub)/DR)
+        r = np.linspace(self.rhub, self.rrim, n_vol_integration)
+
+        # Vol. computation
+        self.V = np.trapezoid(self.Af(r), r)
+        self.A = self.V/self.l
+
     @abstractmethod
     def phi(self, r) -> np.ndarray:
         """Represents cell midline equation in the form of angular coordinate
@@ -127,13 +136,13 @@ class ImpellerCell(ABC):
 
         return mu
 
-    def duct_area(self, r):
+    def Af(self, r):
         """Computes and returns cross-area of the radial flow in the cell for given
         radial coordinate r."""
 
-        A = self.l * self.delta * r * self.mu(r)
+        Af = self.l * self.delta * r * self.mu(r)
 
-        return A
+        return Af
 
 
 @dataclass

@@ -81,7 +81,7 @@ class RotatingField:
         self.t = 0
         self.r, self.phi = grid.generate(cell, shape)
 
-        self.A = cell.duct_area(self.r)
+        self.Af = cell.Af(self.r)
         self.dphidr = calculus.dydx(self.phi, self.r)
 
         self.u = np.zeros_like(self.r)
@@ -110,7 +110,7 @@ class RotatingField:
         dVL = self.VL - prior.VL
         dt = self.t - prior.t
 
-        self.u = - 1 / self.A * dVL / dt
+        self.u = - 1 / self.Af * dVL / dt
         self.w = self.u * self.r * self.dphidr
 
     def dUdt(self, prior: RotatingField):
