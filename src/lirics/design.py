@@ -166,12 +166,13 @@ class ArchImpellerCell(ImpellerCell):
 
     def __post_init__(self):
         self.rcenter = np.sqrt(self.rhub**2+self.rarch**2)
+        super().__post_init__()
 
     def phi(self, r):
 
         phi = (
             np.arcsin(self.rarch/self.rcenter)
-            + np.arccos((r**2 + self.rcenter**2 - self.rarch**2) /
+            - np.arccos((r**2 + self.rcenter**2 - self.rarch**2) /
                         (2*r*self.rcenter)))
 
         return phi
