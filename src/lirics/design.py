@@ -136,6 +136,7 @@ class ImpellerCell(ABC):
         return A
 
 
+@dataclass
 class StraightImpellerCell(ImpellerCell):
     """Class representing cell with straight midline. This class re-implemets midline
     equation so that it always returns array of zeros compliant with the shape of the
@@ -145,14 +146,26 @@ class StraightImpellerCell(ImpellerCell):
         return np.zeros_like(r)
 
 
+@dataclass
 class ArchImpellerCell(ImpellerCell):
-    """Class representing cell with arch-shaped midline. Adds arch radius rarch attribute
-    used in the phi(r)."""
+    """Class representing cell with arch-shaped midline. Adds arch radius attribute rarch
+    and arch center radius-vectro attribut rcenter used in the phi(r).
+
+    rcenter is computed internally and should not be modified after object creation."""
 
     rarch: float
 
+    def __post_init__(self):
+        self.rcenter = np.sqrt(self.rhub**2+self.rarch**2)
+
     def phi(self, r):
-        pass
+
+        phi = (
+            np.arcsin(self.rarch/self.rcenter)
+            + np.arccos((r**2 + self.rcenter**2 - self.rarch**2) /
+                        (2*r*self.rcenter)))
+
+        return phi
 
 
 @dataclass
