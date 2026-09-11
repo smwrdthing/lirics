@@ -247,3 +247,13 @@ class EllipticHousing(Housing):
                  np.sin(alpha)**2/self.B**2))
 
         return R
+
+
+# Convenience functions ahead
+
+def infer_arch_radius(rhub, rrim, betarim):
+
+    rarch = (rrim**2 - rhub**2) /\
+        (2*rrim*np.cos(betarim))
+
+    return rarch
