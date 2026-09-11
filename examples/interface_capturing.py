@@ -28,7 +28,7 @@ cell = design.ArchImpellerCell(
 )
 
 # Fields construction
-VLstar = 1e-3
+VLstar = 3e-4
 Q = 5e-3
 dVL = Q*DT
 VL = VLstar+dVL
@@ -45,8 +45,10 @@ cell_field.dUdt(old_cell_field)
 cell_field.dUdr()
 cell_field.gradP()
 
-rref = 0.55*(cell.rhub+cell.rrim)
+rref = 0.6*(cell.rhub+cell.rrim)
 cell_field.capture_inteface(rref)
+loop = cell_field.eval_vof()
+actualVL = cell_field.actualVL
 
 # Plotting interface capturing results
 fig, ax = plt.subplots()
@@ -78,17 +80,24 @@ ax.plot(x_grid*1e3, y_grid*1e3, '0.5', linewidth=0.8, alpha=0.4)
 ax.plot(x_grid.T*1e3, y_grid.T*1e3, '0.5', linewidth=0.8, alpha=0.4)
 ax.plot(xif*1e3, yif*1e3, 'C0')
 
+xloop, yloop = transform.rphi_to_xy(*loop)
+ax.plot(xloop*1e3, yloop*1e3, "r.")
+
 xcenter = float(np.mean(xlims))
 ycenter = float(np.mean(ylims))
-xtxt = xlims[0]+10
-ytxt = [ylims[-1]-15]
-dytxt = 10
-for i in range(3):
+xtxt = xlims[0]+15
+ytxt = [ylims[-1]-10]
+dytxt = 8
+for i in range(5):
     ytxt.append(ytxt[-1]-dytxt)
 
 s = 8
 ax.text(xtxt, ytxt[0], r"$\Delta t=$"+f"{DT*1e3:.2f} ms", {"size": s})
 ax.text(xtxt, ytxt[1], r"$Q^{(L)}=$"+f"{Q*1e3*60:.2f} L/min", {"size": s})
-ax.text(xtxt, ytxt[2], r"$\Delta V^{(L)}=$"+f"{dVL*1e3:.2e} L", {"size": s})
+ax.text(xtxt, ytxt[2], r"$V^{(L)}=$"+f"{VL*1e3:.2e} L", {"size": s})
+ax.text(xtxt, ytxt[3], r"$V^{*(L)}=$"+f"{VLstar*1e3:.2e} L", {"size": s})
+ax.text(xtxt, ytxt[4], r"$\Delta V^{(L)}=$"+f"{dVL*1e3:.2e} L", {"size": s})
+ax.text(
+    xtxt, ytxt[5], r"$V^{(L)}_{act.}=$"+f"{actualVL*1e3:.2e} L", {"size": s})
 
 plt.show()

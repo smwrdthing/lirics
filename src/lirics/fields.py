@@ -75,7 +75,7 @@ class RotatingField:
         self.TV = np.nan
 
         self.VL = VL
-        self.VLinterface = np.nan
+        self.actualVL = np.nan
 
         # Considered flow is incompressible, so density "field" is constant
         self.rho = rho
@@ -214,13 +214,44 @@ class RotatingField:
             # to return nan
             self.phiif[i] = cell.phi(self.rif[i]) + dphi - self.phicorr[i]
 
-    def evaluate_liquid_volume(self):
-        """Evaluate volume of liquid residing within a field."""
+    def eval_vof(self):
+        """Compute interface-based volume of fluids in the domain of the field.
+        Computation is based on the Green-Gauss are for arbitrary polygon.
+        Interface, frontal cell line, rim arch and back cell line are assembeled
+        into unified looped path over which appropriate integration is preformed.
 
-        # For this we must process surface points on domain boundaries correctly and
-        # evaluate area of the domain occupied by liquid with Gauss's area formula
+        For further details refer to areaGreenGauss in calculus module, Green theorem,
+        Gauss area formula (also known as shoelaces formula)."""
 
-        pass
+        cell = self._cell
+
+        interface = self.rif, self.phiif
+
+        # black magic with array filtering ahead, hold on to your hats,
+        # ladies and gentlemen
+        frontfilter = (self.r[:, FRONT] > self.rif[FRONT])
+        rfront = [self.rif[FRONT], *self.r[frontfilter, FRONT]]
+        phifront = [self.phiif[FRONT], *self.phi[frontfilter, FRONT]]
+        frontline = rfront[:-1], phifront[:-1]
+
+        rimarch = self.r[RIM, ::-1], self.phi[RIM, ::-1]
+
+        backfilter = (self.r[:, BACK] > self.rif[BACK])
+        rback = [*self.r[backfilter, BACK][::-1], self.rif[BACK]]
+        phiback = [*self.phi[backfilter, BACK][::-1], self.phiif[BACK]]
+        backline = rback, phiback
+        # Last point duplication is intentional, do not touch!
+
+        loop = np.hstack((interface, frontline, rimarch, backline))
+
+        # NOTE : following expression calculates actual interface-based volume
+        #        of fluid but does not yet accoutn for cluttering, whis should be
+        #        added in one form or another. Current plan is to multiply this by
+        #        avearge clattering coefficient.
+        self.actualVL = abs(
+            cell.l * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
+
+        return loop  # return looped path for debugging and test purposes
 
     def solve(
             self,
@@ -241,13 +272,13 @@ class RotatingField:
 
         # we can use prior field surface position for initial guesse
         r_ref = 0.5*(self.r[HUB, ANY] + self.r[RIM, ANY])
-        while abs(self.VL - self.VLinterface) > tol:
+        while abs(self.VL - self.actualVL) > tol:
             # interface resolution loop here, something like this:
             self.capture_inteface(r_ref)
-            self.evaluate_liquid_volume()
+            self.vof()
 
             # actual logic for r_ref adjjustment must be there
-            if self.VLinterface > self.VL:
+            if self.actualVL > self.VL:
                 # Interface-based liquid volume evaluation overshoot target
                 # liquid volume, so we must move our interface up
                 r_ref += 0.1*r_ref
