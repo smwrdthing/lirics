@@ -1,12 +1,20 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Callable
+from numpy.typing import NDArray
 
 import numpy as np
 from scipy.constants import g
+from scipy.interpolate import LinearNDInterpolator as linearNDintp
+from scipy.optimize import fsolve
 
 from lirics import calculus
 from lirics import grid
 from lirics.design import ImpellerCell, Housing
+
+
+type ScipyInterpolator = Callable[[tuple[NDArray, NDArray], NDArray], NDArray]
+
 
 # Container access keys
 HUB = 0
@@ -52,6 +60,8 @@ class RotatingField:
             omega: float
     ) -> None:
 
+        self._cell = cell
+
         self.V = cell.V
 
         # Vapor parameters?
@@ -86,8 +96,11 @@ class RotatingField:
         self.dpdr = np.zeros_like(self.r)
         self.dpdphi = np.zeros_like(self.r)
 
-        self.r_interface = np.nan
-        self.phi_interface = np.nan
+        self.dprim = np.zeros_like(self.phi[RIM])
+
+        # Attributes to hold interface points
+        self.rif = np.zeros_like(self.phi[RIM])
+        self.phiif = np.zeros_like(self.phi[RIM])
 
     def U(self, prior: RotatingField):
         """Calculates velocity field components with volumetric flow rate computed
@@ -166,7 +179,58 @@ class RotatingField:
         # the rectilinear grid is possible (and is implemented in other branch),
         # but I doubt that it is practical
 
-        pass
+        cell = self._cell
+        gradP = [self.dpdr, self.dpdphi]
+
+        dpdr_intp = linearNDintp(
+            self.r.ravel(), self.phi.ravel(), self.dpdr.ravel())
+        dpdphi_intp = linearNDintp(
+            self.r.ravel(), self.phi.ravel(), self.dpdphi.ravel())
+        gradPintp = [dpdr_intp, dpdphi_intp]
+
+        up = grid.pave_radial_path(
+            cell,
+            start=(rref, cell.phi(rref)),
+            stop=(cell.rrim, cell.phi(cell.rrim)))
+
+        # NOTE : retain this until pathinterp and pathtrapz tested
+        # dpdrup = dpdr_intp(up)
+        # dpdphiup = dpdphi_intp(up)
+        # dpup = calculus.linetrapz(up, (dpdrup, dpdphiup))
+        dpup = pathtrapz(up, gradP, gradPintp)
+
+        for i, phi in enumerate(self.phi[RIM]):
+
+            side = grid.pave_angular_path(
+                start=(cell.rrim, cell.phi(cell.rrim)),
+                stop=(cell.rrim, phi))
+
+            # dpdrside = dpdr_intp(side)
+            # dpdphiside = dpdphi_intp(side)
+            # dpside = calculus.linetrapz(side, (dpdrside, dpdphiside))
+            dpside = pathtrapz(side, gradP, gradPintp)
+
+            self.dprim[i] = dpup + dpside
+
+        for i, phi in enumerate(self.phi[RIM]):
+
+            # This should do the trick, it does, however, look like
+            # debugging/maintenance hell. I guess we should test it with fire,
+            # not sure if we need additional functions/methods if this works fine
+            dphi = phi-cell.phi(cell.rrim)
+            self.rif[i] = fsolve(
+                lambda rdown:
+                    self.dprim[i]
+                    + pathtrapz(
+                        grid.pave_radial_path(
+                            cell,
+                            start=(cell.rrim, phi),
+                            stop=(rdown, cell.phi(rdown)+dphi)),
+                        gradP,
+                        gradPintp),
+                0.5*(cell.rrim+cell.rhub)
+            )
+            self.phiif[i] = cell.phi(self.rif[i])+dphi
 
     def evaluate_liquid_volume(self):
         """Evaluate volume of liquid residing within a field."""
@@ -327,3 +391,38 @@ class LinearStationaryFiled(StationaryField):
 
 class QuadraticStationaryField(StationaryField):
     pass
+
+
+def pathinterp(
+        path: tuple[np.ndarray, np.ndarray],
+        field: list[np.ndarray],
+        intp: list[ScipyInterpolator]):
+    """Convenience field-on-path interpolator. Handles generic 2D field interpolation
+    for interface reconstruction. Accepts desired path for interpolation,
+    field-to-be interpolated and interpolator as inputs.
+
+    Field is considered to be vector field, thus each entry represenst component of
+    such field. Components themselves are scalar fields. Function performs interpolation
+    of each component of vector field over provided path and returns list with each entry
+    corresponding to interpolation of components.
+
+    Mostly used for pressure "gradient" field interpolation.
+    """
+
+    f_interp = []
+    for f, i in zip(field, intp):
+        f_interp.append(i(path, f))
+
+    return tuple(f_interp)
+
+
+def pathtrapz(path, field, intp):
+    """Convinience functino for line integral along path with interpolated field values.
+    Uses pathinterp, so pathinterp restrictions and features must be considered.
+
+    Mistly used for pressure "gradient" field integration."""
+
+    f_interp = pathinterp(path, field, intp)
+    integral = calculus.linetrapz(path, f_interp)
+
+    return integral

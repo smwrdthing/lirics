@@ -41,7 +41,7 @@ def pave_radial_path(
         cell: ImpellerCell,
         start: polarCoordinates,
         stop: polarCoordinates,
-        n=NUM_OF_PATH_POINTS) -> tuple[Numeric, Numeric]:
+        n=NUM_OF_PATH_POINTS) -> tuple[NDArray, NDArray]:
     """Generates (r,phi) points conformal to (shifted) cell midline.
     Shifting is handled internally by means of the provided start point in polar
     coordinates, angular coordinate of stop point is not used."""
