@@ -19,12 +19,12 @@ N_PHI_SEGMENTS = 31
 
 # cell object construction
 cell = design.ArchImpellerCell(
-    rhub=100e-3,
-    rrim=200e-3,
+    rhub := 100e-3,
+    rrim := 200e-3,
+    rarch=design.infer_arch_radius(rhub, rrim, np.deg2rad(55)),
     l=100e-3,
     delta=np.deg2rad(360/NUM_OF_CELLS),
-    s=5e-3,
-    rarch=110e-3
+    s=5e-3
 )
 
 # Fields construction
