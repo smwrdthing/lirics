@@ -37,6 +37,7 @@ class ImpellerCell(ABC):
 
     A: float = field(init=False)
     V: float = field(init=False)
+    avmu: float = field(init=False)
 
     def __post_init__(self):
 
@@ -46,6 +47,9 @@ class ImpellerCell(ABC):
         # Vol. computation
         self.V = np.trapezoid(self.Af(r), r)
         self.A = self.V/self.l
+
+        # Average cluttering coefficient for further volume computations
+        self.avmu = 1/(self.rrim-self.rhub) * np.trapezoid(self.mu(r), r)
 
     @abstractmethod
     def phi(self, r) -> np.ndarray:
@@ -132,7 +136,7 @@ class ImpellerCell(ABC):
         of vanes thickness inside the cell."""
 
         mu = 1 - self.s / self.delta / \
-            np.sin(self.theta(r, dr))
+            (r*np.sin(self.beta(r)))
 
         return mu
 

@@ -249,7 +249,7 @@ class RotatingField:
         #        added in one form or another. Current plan is to multiply this by
         #        avearge clattering coefficient.
         self.actualVL = abs(
-            cell.l * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
+            cell.l * cell.avmu * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
 
         return loop  # return looped path for debugging and test purposes
 
