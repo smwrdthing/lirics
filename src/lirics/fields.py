@@ -259,7 +259,7 @@ class RotatingField:
         self.capture_inteface(rref)
         self.evalvof()
 
-        return self.V-self.actualVL
+        return self.VL-self.actualVL
 
     def solve(
             self,
