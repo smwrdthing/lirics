@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import numpy as np
 from scipy.constants import g
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
-from scipy.optimize import fsolve, newton
+from scipy.optimize import fsolve, newton, brentq
 
 from lirics import calculus
 from lirics import grid
