@@ -244,10 +244,6 @@ class RotatingField:
 
         loop = np.hstack((interface, frontline, rimarch, backline))
 
-        # NOTE : following expression calculates actual interface-based volume
-        #        of fluid but does not yet accoutn for cluttering, whis should be
-        #        added in one form or another. Current plan is to multiply this by
-        #        avearge clattering coefficient.
         self.actualVL = abs(
             cell.l * cell.avmu * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
 
@@ -267,9 +263,7 @@ class RotatingField:
 
     def solve(
             self,
-            VLnew: float,
             prior: RotatingField,
-            time_step: float,
     ):
         """Implements solution algorithm for the flow field in the cell of the
         liquid ring machine. Sets new (guessed) value of liquid volume in the cell
@@ -291,9 +285,6 @@ class RotatingField:
         solver to formulate mass-balance residual-based procedure which will ensure
         correct VLnew for the cell."""
 
-        self.VL = VLnew
-        self.t = prior.t + time_step
-
         self.U(prior)
         self.dUdr()
         self.dUdt(prior)
@@ -304,7 +295,8 @@ class RotatingField:
         # calls to evalvof() (re-calc. actaual interface-based vof).
         # So last call during which convergence is achieved we should
         # get proper interface location
-        newton(self.errvof, np.mean(prior.rif))
+        rguesse = 0.5*(self._cell.rhub+self._cell.rrim)
+        newton(self.errvof, rguesse)
 
 
 class StationaryField(ABC):
