@@ -47,7 +47,7 @@ cell_field.gradP()
 
 rref = 0.6*(cell.rhub+cell.rrim)
 cell_field.capture_inteface(rref)
-loop = cell_field.eval_vof()
+loop = cell_field.evalvof()
 actualVL = cell_field.actualVL
 
 # Plotting interface capturing results

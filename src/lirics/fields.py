@@ -214,7 +214,7 @@ class RotatingField:
             # to return nan
             self.phiif[i] = cell.phi(self.rif[i]) + dphi - self.phicorr[i]
 
-    def eval_vof(self):
+    def evalvof(self):
         """Compute interface-based volume of fluids in the domain of the field.
         Computation is based on the Green-Gauss are for arbitrary polygon.
         Interface, frontal cell line, rim arch and back cell line are assembeled
@@ -253,16 +253,45 @@ class RotatingField:
 
         return loop  # return looped path for debugging and test purposes
 
+    def errvof(self, rref):
+        """Aids in flow-field resolution in the cell. Captures interface location for
+        given rref and then evaluates volume of fluid in the cell based on the location
+        of the interface.
+
+        Used in solution algorithm as a function for rootfinding with Newton method."""
+
+        self.capture_inteface(rref)
+        self.evalvof()
+
+        return self.V-self.actualVL
+
     def solve(
             self,
-            volume_of_liquid: float,
+            VLnew: float,
             prior: RotatingField,
             time_step: float,
-            tol: float
     ):
-        """Solve flow field for the next spatio-temporal state of the domain."""
+        """Implements solution algorithm for the flow field in the cell of the
+        liquid ring machine. Sets new (guessed) value of liquid volume in the cell
+        VLnew  and new value for time t. Uses prior-state field for temporal derivative.
 
-        self.VL = volume_of_liquid
+        Flow field is resolved by means of solving two rootfinding problems:
+
+        > First problem corresponds to interface capturing for given reference point
+          on the midline of the cell. This problem actually comprises of multiple
+          rootfinding problems, each searching for location where pressure difference
+          turns zero.
+            For further details on this part of algorithm refer to capture_interface
+
+        > Second problem correspond to the search of correct rref value which will,
+          in fact, ensure that computed interface corresponds to given VLnew value.
+
+        Only resolves flow field in the cell of the liquid ring machine.
+        For full-featured quasi-2D modelling this must be coupled with stationary-field
+        solver to formulate mass-balance residual-based procedure which will ensure
+        correct VLnew for the cell."""
+
+        self.VL = VLnew
         self.t = prior.t + time_step
 
         self.U(prior)
@@ -270,30 +299,12 @@ class RotatingField:
         self.dUdt(prior)
         self.gradP()
 
-        # we can use prior field surface position for initial guesse
-        r_ref = 0.5*(self.r[HUB, ANY] + self.r[RIM, ANY])
-        while abs(self.VL - self.actualVL) > tol:
-            # interface resolution loop here, something like this:
-            self.capture_inteface(r_ref)
-            self.vof()
-
-            # actual logic for r_ref adjjustment must be there
-            if self.actualVL > self.VL:
-                # Interface-based liquid volume evaluation overshoot target
-                # liquid volume, so we must move our interface up
-                r_ref += 0.1*r_ref
-            else:
-                # Interface-based liquid volume evaluation did not reach target
-                # liquid volume, so we must move our interface down
-                r_ref -= 0.1*r_ref
-
-        # NOTE : preformance considerations
-        # We can pose this as function minimisation prbolem actually,
-        # probably scipy-rootfinding will be more performant than this direct loop
-        #
-        # maybe JIT with numba?
-        #
-        # Also we must ensure robust surface tracking for this to work smoothly
+        # Using newton optimizer should cut it, calls ro errvof lead to
+        # calls to capture_interface (re-calc. interface location) and
+        # calls to evalvof() (re-calc. actaual interface-based vof).
+        # So last call during which convergence is achieved we should
+        # get proper interface location
+        newton(self.errvof, np.mean(prior.rif))
 
 
 class StationaryField(ABC):
