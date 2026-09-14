@@ -28,6 +28,11 @@ def translate(x, y, dr):
     return x_new, y_new
 
 
+def scale(x, y, factor):
+    """Scales input points by given factor. Convenient for length unit conversions."""
+    return x*factor, y*factor
+
+
 def xy_to_rphi(x, y):
     """Performs transformation of (x,y) points from Cartesian coordinate system to
     polar coordinate system (r,phi) and returns transformed coordinates."""
