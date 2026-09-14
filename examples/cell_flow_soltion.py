@@ -29,12 +29,12 @@ cell = design.ArchImpellerCell(
 )
 
 # Fields construction
-VLstar = 0.2*cell.V
+VLstar = 0.12*cell.V
 old_cell_field = fields.RotatingField(cell, SHAPE, VLstar, DENSITY, OMEGA)
 cell_field = fields.RotatingField(cell, SHAPE, VLstar, DENSITY, OMEGA)
 
 # Fields computation
-Q = 1.470151e-3
+Q = 1.5e-3
 cell_field.t += DT
 cell_field.VL += Q*DT
 cell_field.solve(old_cell_field)

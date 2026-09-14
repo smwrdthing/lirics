@@ -197,6 +197,9 @@ class RotatingField:
 
         for i, phi in enumerate(self.phi[RIM]+self.phicorr):
 
+            # Searching for dp = 0 when moving from rim to the centerline.
+            # This will fail to converge without good initial guesse.
+            # Using rref as initial guesse proved to be acceptable
             dphi = phi-cell.phi(cell.rrim)
             self.rif[i] = newton(
                 lambda rdown:
@@ -207,7 +210,7 @@ class RotatingField:
                             start=(cell.rrim, phi),
                             stop=(rdown, cell.phi(rdown)+dphi)),
                         gradPintp),
-                0.5*(cell.rrim+cell.rhub))
+                rref)
 
             # phi corrector is applied because otherwise interpolated curve
             # points fall outside of the domain which causes scipy interpolator
@@ -290,12 +293,16 @@ class RotatingField:
         self.dUdt(prior)
         self.gradP()
 
-        # Using newton optimizer should cut it, calls ro errvof lead to
+        # Using newton optimizer from scipy cuts it, calls ro errvof lead to
         # calls to capture_interface (re-calc. interface location) and
         # calls to evalvof() (re-calc. actaual interface-based vof).
-        # So last call during which convergence is achieved we should
-        # get proper interface location
-        rguesse = 0.5*(self._cell.rhub+self._cell.rrim)
+        # So we should get everything last during last call when convergence
+        # is achieved.
+        # Initial guesse for interface loaction on the cell midline is based on
+        # cylindrical interface shape assumption.
+        cell = self._cell
+        rguesse = np.sqrt(cell.rrim**2 - 2*self.VL /
+                          (cell.delta * cell.l * cell.avmu))
         newton(self.errvof, rguesse)
 
 
