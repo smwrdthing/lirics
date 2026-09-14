@@ -35,7 +35,7 @@ def dydx(y: NDArray, x: NDArray) -> NDArray:
             dFdy = dydx(F.T,Y.T).T
 
     Transposition is required in the second case because internally "x" is assumed
-    to cahnge along rows."""
+    to cahnge by rows."""
 
     dydx = np.zeros_like(x)
 
