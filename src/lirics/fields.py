@@ -201,16 +201,28 @@ class RotatingField:
             # This will fail to converge without good initial guesse.
             # Using rref as initial guesse proved to be acceptable
             dphi = phi-cell.phi(cell.rrim)
-            self.rif[i] = newton(
-                lambda rdown:
-                    self.dprim[i]
-                    + pathtrapz(
-                        grid.pave_radial_path(
-                            cell,
-                            start=(cell.rrim, phi),
-                            stop=(rdown, cell.phi(rdown)+dphi)),
-                        gradPintp),
-                rref)
+            try:
+                self.rif[i] = newton(
+                    lambda rdown:
+                        self.dprim[i]
+                        + pathtrapz(
+                            grid.pave_radial_path(
+                                cell,
+                                start=(cell.rrim, phi),
+                                stop=(rdown, cell.phi(rdown)+dphi)),
+                            gradPintp),
+                    rref)
+            except RuntimeError:
+                print(
+                    "WARNING : Failed to converge dp=0 problem, opting to fallback values"
+                    + "(use for debugging only!)")
+                if i == 0:
+                    print("Fallback value : rref")
+                    rfallback = rref
+                else:
+                    print("Fallback value: last written rif")
+                    rfallback = self.rif[i-1]
+                self.rif[i] = rfallback
 
             # phi corrector is applied because otherwise interpolated curve
             # points fall outside of the domain which causes scipy interpolator
@@ -304,6 +316,12 @@ class RotatingField:
         rguesse = np.sqrt(cell.rrim**2 - 2*self.VL /
                           (cell.delta * cell.l * cell.avmu))
         newton(self.errvof, rguesse)
+
+        # At this point interface and liquid vof are resolved, so we can
+        # compute vapor properties and then pressure on the rim
+        # self.VV = self.V - self.VL
+        # self.pV = self.TV
+        # ...
 
 
 class StationaryField(ABC):
