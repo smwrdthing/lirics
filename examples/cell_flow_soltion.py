@@ -70,8 +70,3 @@ ax.plot(x_grid.T*1e3, y_grid.T*1e3, '0.5', linewidth=0.8, alpha=0.4)
 ax.plot(xif*1e3, yif*1e3, 'C0')
 
 plt.show()
-
-# NOTE : WIP
-#        Should brainstorm robustness, add some sanity checks, investigate algorithm,
-#        find a way to make better initial guesses, maybe?
-#        This one on not particularly reliable, it should not be like that
