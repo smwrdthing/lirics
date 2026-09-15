@@ -261,3 +261,10 @@ def infer_arch_radius(rhub, rrim, betarim):
         (2*rrim*np.cos(betarim))
 
     return rarch
+
+
+def infer_housing_radius(rrim: float, e: float, Smin: float = 0):
+
+    Delta = Smin + rrim + 2*e
+
+    return Delta

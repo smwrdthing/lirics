@@ -48,7 +48,7 @@ class GeneralizedPfleiderer(ABC):
         self.muz = (1 + delta/4 * np.sin(beta2)/(1-self.nu))**-1
         self.psi = np.sqrt((1 + (1-self.nu)/np.pi/np.tan(beta2))*self.muz)
         self.zeta = L/l
-        self.epsilon = params["omega"]**2 * rrim**2/(2*g*Hsuc)
+        self.epsilon = params["omega"]**2 * rrim**2/(2*Hsuc)
         self.alpha = params["a"]/rrim
         self.mu = 1 - 2*s / (delta * rrim**2 * (1-self.nu**2))
 
@@ -108,7 +108,7 @@ class GeneralizedPfleiderer(ABC):
         """Returns dimensionless coefficient in the equation for pressure ratio vs
         rotational angle dependency."""
 
-        k = 2*self.zeta/self.mu * 1/((1-self.alpha**2) - self.nu**2)
+        k = 2*self.zeta/self.mu * 1/((1-self.alpha)**2 - self.nu**2)
         rrim = self._cell.rrim
 
         A = k * self.lowS(alpha)/rrim
@@ -118,10 +118,10 @@ class GeneralizedPfleiderer(ABC):
     def sigma(self, alpha):
         """Returns pressure ratio for given rotational angle. Pressure ratio is obtained
         as solution of cubic equation for pressure ratio. Equation is solved numerically
-        with polyroot() function from numpy.polynomial.polynomial module, polyroot()
+        with polyroots() function from numpy.polynomial.polynomial module, polyroots()
         return is porcessed appropriately to select proper root out of the three.
 
-        polyroot() handles one polynomial at a tmie, so array input makes native python
+        polyroots() handles one polynomial at a tmie, so array input makes native python
         loop unavoidable, this could hinder performance for large input arrays.
 
         Equation for pressure ratio is obtained with assumptoin of watertight cell and
@@ -129,19 +129,23 @@ class GeneralizedPfleiderer(ABC):
 
         ones = np.ones_like(alpha)
         zeros = np.zeros_like(alpha)
-        coeffs = np.array([
-            ones,
-            -(self.epsilon*self.psi**2 + 1)*ones,
+        coeffs = np.atleast_2d([  # ascending power order!
+            -self.epsilon/self.A(alpha)**2,
             zeros,
-            self.epsilon/self.A(alpha)
-        ]).T
+            -(self.epsilon*self.psi**2 + 1)*ones,
+            ones,
+        ])
 
         sigma = []
         for c in coeffs:
             r = polyroots(c)
-            sigma.append(r[r > 1])
+            r = np.real(r[np.isreal(r)])
+            sigma.append(np.min(r))
+            print(sigma)
         sigma = np.array(sigma).flatten()
 
+        if len(sigma == 1):
+            return sigma[0]
         return sigma
 
     def rifsuc(self, alpha):
