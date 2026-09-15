@@ -227,7 +227,7 @@ class CylindricalHousing(Housing):
         leads to quadratic equatino in R. Solution of this equation and selection of
         physically sensibel root leads to implemented equation:"""
 
-        R = self.e*np.sqrt(alpha) + np.sqrt(
+        R = self.e*np.cos(alpha) + np.sqrt(
             self.Rc**2 - self.e*(1-np.cos(alpha)**2))
 
         return R
