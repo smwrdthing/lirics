@@ -157,7 +157,7 @@ class GeneralizedPfleiderer(ABC):
         rrim = self._cell.rrim
 
         rifs = rrim * np.sqrt(
-            2*self.zeta*self.psi/self.mu * (self.S(alpha)-self.S(0))/rrim
+            2*self.zeta/self.mu * self.lowS(alpha)/rrim * self.psi
             + self.nu**2)
 
         return rifs
