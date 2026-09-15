@@ -228,7 +228,7 @@ class CylindricalHousing(Housing):
         physically sensibel root leads to implemented equation:"""
 
         R = self.e*np.cos(alpha) + np.sqrt(
-            self.Rc**2 - self.e*(1-np.cos(alpha)**2))
+            self.Rc**2 - self.e**2*(1-np.cos(alpha)**2))
 
         return R
 
@@ -265,6 +265,6 @@ def infer_arch_radius(rhub, rrim, betarim):
 
 def infer_housing_radius(rrim: float, e: float, Smin: float = 0):
 
-    Delta = Smin + rrim + 2*e
+    Rc = Smin + rrim + e
 
-    return Delta
+    return Rc

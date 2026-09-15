@@ -34,8 +34,7 @@ class GeneralizedPfleiderer(ABC):
 
         Hsuc = params["pVsuc"]/params["rhoL"]/g
 
-        # Computing necessary coefficients adn parameters
-        beta2 = cell.beta(cell.rrim)
+        # Computing necessary coefficients and parameters
         s = cell.s
         rrim = cell.rrim
         rhub = cell.rhub
@@ -44,26 +43,27 @@ class GeneralizedPfleiderer(ABC):
 
         L = housing.L
 
+        urim = params["omega"]*rrim
+
         self.nu = rhub/rrim
-        self.muz = (1 + delta/4 * np.sin(beta2)/(1-self.nu))**-1
-        self.psi = np.sqrt((1 + (1-self.nu)/np.pi/np.tan(beta2))*self.muz)
+        self.psi = 1.0
         self.zeta = L/l
-        self.epsilon = params["omega"]**2 * rrim**2/(2*Hsuc)
+        self.epsilon = urim**2 / (2*g*Hsuc)
         self.alpha = params["a"]/rrim
-        self.mu = 1 - 2*s / (delta * rrim**2 * (1-self.nu**2))
+        self.mu = 1 - s / (delta/2 * rrim**2 * (1-self.nu**2))
 
         self.sigmad = self.sigma(params["alphadis"])
 
         # Checking limits of the model
         sigmamax = 2/3 * (self.epsilon*self.psi**2 + 1)
-        epsilonmin = 2/self.psi**2 * (3/2*self.sigmad - 1)
+        epsilonmin = 1/self.psi**2 * (3/2*self.sigmad - 1)
 
         if self.epsilon < epsilonmin:
 
             msg = (
                 "Value of velocity coefficient falls outside of the model limits.\n" +
                 f"Min. acceptable value is {epsilonmin}, but model parameters " +
-                f"produces {self.epsilon}.\nConsider increasing suction pressure or " +
+                f"produce {self.epsilon}.\nConsider increasing suction pressure or " +
                 "increasing circumferential velocity.")
 
             raise ValueError(msg)
@@ -127,25 +127,24 @@ class GeneralizedPfleiderer(ABC):
         Equation for pressure ratio is obtained with assumptoin of watertight cell and
         isothermal compression."""
 
+        alpha = np.atleast_1d(alpha)
+
         ones = np.ones_like(alpha)
         zeros = np.zeros_like(alpha)
-        coeffs = np.atleast_2d([  # ascending power order!
-            -self.epsilon/self.A(alpha)**2,
+        coeffs = np.array([  # ascending power order!
+            self.epsilon/self.A(alpha)**2,
             zeros,
             -(self.epsilon*self.psi**2 + 1)*ones,
             ones,
-        ])
+        ]).T
 
         sigma = []
         for c in coeffs:
             r = polyroots(c)
             r = np.real(r[np.isreal(r)])
             sigma.append(np.min(r))
-            print(sigma)
         sigma = np.array(sigma).flatten()
 
-        if len(sigma == 1):
-            return sigma[0]
         return sigma
 
     def rifsuc(self, alpha):
@@ -203,7 +202,7 @@ class GeneralizedPfleiderer(ABC):
 
         suc = (alpha >= 0) * (alpha < alphamid)
         com = (alpha >= alphamid) * (alpha < alphadis)
-        dis = (alpha >= alphadis) * (alpha < alphamax)
+        dis = (alpha >= alphadis) * (alpha <= alphamax)
 
         rif = np.concatenate(
             (self.rifsuc(alpha[suc]),
