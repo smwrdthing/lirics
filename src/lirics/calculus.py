@@ -35,7 +35,7 @@ def dydx(y: NDArray, x: NDArray) -> NDArray:
             dFdy = dydx(F.T,Y.T).T
 
     Transposition is required in the second case because internally "x" is assumed
-    to cahnge along rows."""
+    to cahnge by rows."""
 
     dydx = np.zeros_like(x)
 
@@ -61,3 +61,14 @@ def linetrapz(path, components):
     # np.trapezoid for each component (P,Q,...) and corresponding path (x,y,...)
 
     return np.sum(np.trapezoid(components, path))
+
+
+def areaGreenGauss(path):
+    """Implementation of arbitrary polygon area calculation using Green's theorem.
+    Choice of P(x,y), Q(x,y) functions is made so that expanded discretization
+    of Green's theroem leads to Gauss formula (also known as "shoelaces formula")."""
+
+    x, y = path
+    P, Q = -y/2, x/2
+
+    return linetrapz(path, (P, Q))

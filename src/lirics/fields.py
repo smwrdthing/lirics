@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import numpy as np
 from scipy.constants import g
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
-from scipy.optimize import fsolve, newton
+from scipy.optimize import fsolve, newton, brentq
 
 from lirics import calculus
 from lirics import grid
@@ -75,7 +75,7 @@ class RotatingField:
         self.TV = np.nan
 
         self.VL = VL
-        self.VLinterface = np.nan
+        self.actualVL = np.nan
 
         # Considered flow is incompressible, so density "field" is constant
         self.rho = rho
@@ -197,72 +197,131 @@ class RotatingField:
 
         for i, phi in enumerate(self.phi[RIM]+self.phicorr):
 
+            # Searching for dp = 0 when moving from rim to the centerline.
+            # This will fail to converge without good initial guesse.
+            # Using rref as initial guesse proved to be acceptable
             dphi = phi-cell.phi(cell.rrim)
-            self.rif[i] = newton(
-                lambda rdown:
-                    self.dprim[i]
-                    + pathtrapz(
-                        grid.pave_radial_path(
-                            cell,
-                            start=(cell.rrim, phi),
-                            stop=(rdown, cell.phi(rdown)+dphi)),
-                        gradPintp),
-                0.5*(cell.rrim+cell.rhub))
+            try:
+                self.rif[i] = newton(
+                    lambda rdown:
+                        self.dprim[i]
+                        + pathtrapz(
+                            grid.pave_radial_path(
+                                cell,
+                                start=(cell.rrim, phi),
+                                stop=(rdown, cell.phi(rdown)+dphi)),
+                            gradPintp),
+                    rref)
+            except RuntimeError:
+                print(
+                    "WARNING : Failed to converge dp=0 problem, opting to fallback values"
+                    + "(use for debugging only!)")
+                if i == 0:
+                    print("Fallback value : rref")
+                    rfallback = rref
+                else:
+                    print("Fallback value: last written rif")
+                    rfallback = self.rif[i-1]
+                self.rif[i] = rfallback
 
             # phi corrector is applied because otherwise interpolated curve
             # points fall outside of the domain which causes scipy interpolator
             # to return nan
             self.phiif[i] = cell.phi(self.rif[i]) + dphi - self.phicorr[i]
 
-    def evaluate_liquid_volume(self):
-        """Evaluate volume of liquid residing within a field."""
+    def evalvof(self):
+        """Compute interface-based volume of fluids in the domain of the field.
+        Computation is based on the Green-Gauss are for arbitrary polygon.
+        Interface, frontal cell line, rim arch and back cell line are assembeled
+        into unified looped path over which appropriate integration is preformed.
 
-        # For this we must process surface points on domain boundaries correctly and
-        # evaluate area of the domain occupied by liquid with Gauss's area formula
+        For further details refer to areaGreenGauss in calculus module, Green theorem,
+        Gauss area formula (also known as shoelaces formula)."""
 
-        pass
+        cell = self._cell
+
+        interface = self.rif, self.phiif
+
+        # black magic with array filtering ahead, hold on to your hats,
+        # ladies and gentlemen
+        frontfilter = (self.r[:, FRONT] > self.rif[FRONT])
+        rfront = [self.rif[FRONT], *self.r[frontfilter, FRONT]]
+        phifront = [self.phiif[FRONT], *self.phi[frontfilter, FRONT]]
+        frontline = rfront[:-1], phifront[:-1]
+
+        rimarch = self.r[RIM, ::-1], self.phi[RIM, ::-1]
+
+        backfilter = (self.r[:, BACK] > self.rif[BACK])
+        rback = [*self.r[backfilter, BACK][::-1], self.rif[BACK]]
+        phiback = [*self.phi[backfilter, BACK][::-1], self.phiif[BACK]]
+        backline = rback, phiback
+        # Last point duplication is intentional, do not touch!
+
+        loop = np.hstack((interface, frontline, rimarch, backline))
+
+        self.actualVL = abs(
+            cell.l * cell.avmu * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
+
+        return loop  # return looped path for debugging and test purposes
+
+    def errvof(self, rref):
+        """Aids in flow-field resolution in the cell. Captures interface location for
+        given rref and then evaluates volume of fluid in the cell based on the location
+        of the interface.
+
+        Used in solution algorithm as a function for rootfinding with Newton method."""
+
+        self.capture_inteface(rref)
+        self.evalvof()
+
+        return self.VL-self.actualVL
 
     def solve(
             self,
-            volume_of_liquid: float,
             prior: RotatingField,
-            time_step: float,
-            tol: float
     ):
-        """Solve flow field for the next spatio-temporal state of the domain."""
+        """Implements solution algorithm for the flow field in the cell of the
+        liquid ring machine. Sets new (guessed) value of liquid volume in the cell
+        VLnew  and new value for time t. Uses prior-state field for temporal derivative.
 
-        self.VL = volume_of_liquid
-        self.t = prior.t + time_step
+        Flow field is resolved by means of solving two rootfinding problems:
+
+        > First problem corresponds to interface capturing for given reference point
+          on the midline of the cell. This problem actually comprises of multiple
+          rootfinding problems, each searching for location where pressure difference
+          turns zero.
+            For further details on this part of algorithm refer to capture_interface
+
+        > Second problem correspond to the search of correct rref value which will,
+          in fact, ensure that computed interface corresponds to given VLnew value.
+
+        Only resolves flow field in the cell of the liquid ring machine.
+        For full-featured quasi-2D modelling this must be coupled with stationary-field
+        solver to formulate mass-balance residual-based procedure which will ensure
+        correct VLnew for the cell."""
 
         self.U(prior)
         self.dUdr()
         self.dUdt(prior)
         self.gradP()
 
-        # we can use prior field surface position for initial guesse
-        r_ref = 0.5*(self.r[HUB, ANY] + self.r[RIM, ANY])
-        while abs(self.VL - self.VLinterface) > tol:
-            # interface resolution loop here, something like this:
-            self.capture_inteface(r_ref)
-            self.evaluate_liquid_volume()
+        # Using newton optimizer from scipy cuts it, calls ro errvof lead to
+        # calls to capture_interface (re-calc. interface location) and
+        # calls to evalvof() (re-calc. actaual interface-based vof).
+        # So we should get everything last during last call when convergence
+        # is achieved.
+        # Initial guesse for interface loaction on the cell midline is based on
+        # cylindrical interface shape assumption.
+        cell = self._cell
+        rguesse = np.sqrt(cell.rrim**2 - 2*self.VL /
+                          (cell.delta * cell.l * cell.avmu))
+        newton(self.errvof, rguesse)
 
-            # actual logic for r_ref adjjustment must be there
-            if self.VLinterface > self.VL:
-                # Interface-based liquid volume evaluation overshoot target
-                # liquid volume, so we must move our interface up
-                r_ref += 0.1*r_ref
-            else:
-                # Interface-based liquid volume evaluation did not reach target
-                # liquid volume, so we must move our interface down
-                r_ref -= 0.1*r_ref
-
-        # NOTE : preformance considerations
-        # We can pose this as function minimisation prbolem actually,
-        # probably scipy-rootfinding will be more performant than this direct loop
-        #
-        # maybe JIT with numba?
-        #
-        # Also we must ensure robust surface tracking for this to work smoothly
+        # At this point interface and liquid vof are resolved, so we can
+        # compute vapor properties and then pressure on the rim
+        # self.VV = self.V - self.VL
+        # self.pV = self.TV
+        # ...
 
 
 class StationaryField(ABC):

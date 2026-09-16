@@ -16,6 +16,7 @@ NUM_OF_CELLS = 12
 
 N_R_SEGMENTS = 31
 N_PHI_SEGMENTS = 31
+SHAPE = (N_R_SEGMENTS, N_PHI_SEGMENTS)
 
 # cell object construction
 cell = design.ArchImpellerCell(
@@ -28,27 +29,15 @@ cell = design.ArchImpellerCell(
 )
 
 # Fields construction
-VLstar = 3e-4
-Q = 5e-3
-dVL = Q*DT
-VL = VLstar+dVL
-old_cell_field = fields.RotatingField(
-    cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VLstar, DENSITY, OMEGA
-)
-cell_field = fields.RotatingField(
-    cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VL, DENSITY, OMEGA)
+VLstar = 0.12*cell.V
+old_cell_field = fields.RotatingField(cell, SHAPE, VLstar, DENSITY, OMEGA)
+cell_field = fields.RotatingField(cell, SHAPE, VLstar, DENSITY, OMEGA)
 
 # Fields computation
+Q = 1.5e-3
 cell_field.t += DT
-cell_field.U(old_cell_field)
-cell_field.dUdt(old_cell_field)
-cell_field.dUdr()
-cell_field.gradP()
-
-rref = 0.6*(cell.rhub+cell.rrim)
-cell_field.capture_inteface(rref)
-loop = cell_field.evalvof()
-actualVL = cell_field.actualVL
+cell_field.VL += Q*DT
+cell_field.solve(old_cell_field)
 
 # Plotting interface capturing results
 fig, ax = plt.subplots()
@@ -79,25 +68,5 @@ ax.plot(xrim*1e3, yrim*1e3, 'k')
 ax.plot(x_grid*1e3, y_grid*1e3, '0.5', linewidth=0.8, alpha=0.4)
 ax.plot(x_grid.T*1e3, y_grid.T*1e3, '0.5', linewidth=0.8, alpha=0.4)
 ax.plot(xif*1e3, yif*1e3, 'C0')
-
-xloop, yloop = transform.rphi_to_xy(*loop)
-ax.plot(xloop*1e3, yloop*1e3, "r.")
-
-xcenter = float(np.mean(xlims))
-ycenter = float(np.mean(ylims))
-xtxt = xlims[0]+15
-ytxt = [ylims[-1]-10]
-dytxt = 8
-for i in range(5):
-    ytxt.append(ytxt[-1]-dytxt)
-
-s = 8
-ax.text(xtxt, ytxt[0], r"$\Delta t=$"+f"{DT*1e3:.2f} ms", {"size": s})
-ax.text(xtxt, ytxt[1], r"$Q^{(L)}=$"+f"{Q*1e3*60:.2f} L/min", {"size": s})
-ax.text(xtxt, ytxt[2], r"$V^{(L)}=$"+f"{VL*1e3:.2e} L", {"size": s})
-ax.text(xtxt, ytxt[3], r"$V^{*(L)}=$"+f"{VLstar*1e3:.2e} L", {"size": s})
-ax.text(xtxt, ytxt[4], r"$\Delta V^{(L)}=$"+f"{dVL*1e3:.2e} L", {"size": s})
-ax.text(
-    xtxt, ytxt[5], r"$V^{(L)}_{act.}=$"+f"{actualVL*1e3:.2e} L", {"size": s})
 
 plt.show()

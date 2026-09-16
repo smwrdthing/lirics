@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Literal
 
 # Access indices
 X = 0
@@ -6,6 +7,8 @@ Y = 1
 
 R = 0
 PHI = 1
+
+type AxisSpecifier = Literal["x", "y"]
 
 
 def rotate(x, y, alpha):
@@ -26,6 +29,20 @@ def translate(x, y, dr):
     y_new = y + dr[Y]
 
     return x_new, y_new
+
+
+def scale(x, y, factor):
+    """Scales input points by given factor. Convenient for length unit conversions."""
+    return x*factor, y*factor
+
+
+def reflect(x, y, axis: AxisSpecifier):
+
+    if axis == "x":
+        return x, -y
+
+    if axis == "y":
+        return -x, y
 
 
 def xy_to_rphi(x, y):
