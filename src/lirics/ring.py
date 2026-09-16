@@ -5,34 +5,31 @@ from typing import Literal
 import numpy as np
 from numpy.polynomial.polynomial import polyroots
 from scipy.constants import g
+from scipy.optimize import newton
 
 from lirics.design import ImpellerCell, Housing, CylindricalHousing
+from lirics import transform
 
 
-# Access indices
-START = 0
-END = 1
+NUM_REGION_POINTS = 50
 
 
-# NOTE : currently operational parameters and port edges are passed
-#        in common dictionary, probably not the most elegant approach,
-#        but it is fast. I'll fix it later, when I'll have more time for
-#        this.
-type PfleidereModelParamKey = Literal[
-    "pVsuc", "rhoL", "a", "omega", "alphamax", "alphadis"]
-type PfleidereModelParams = dict[PfleidereModelParamKey, float]
+type PGRParamKey = Literal["pVsuc", "rhoL", "omega", "alphamax", "alphadis"]
+type PGRParams = dict[PGRParamKey, float]
 
 
-class GeneralizedPfleiderer(ABC):
+class PGRGenralized(ABC):
+    """Represents generalize Pfleiderer-Golovincov-Rumyancev 1D model for interface
+    reconstruction in liquid ring machine."""
 
     def __init__(self, cell: ImpellerCell, housing: Housing,
-                 params: PfleidereModelParams) -> None:
+                 params: PGRParams) -> None:
 
         self._cell = cell
         self._housing = housing
         self._params = params
 
-        Hsuc = params["pVsuc"]/params["rhoL"]/g
+        self.Hsuc = params["pVsuc"]/(params["rhoL"]*g)
 
         # Computing necessary coefficients and parameters
         s = cell.s
@@ -40,43 +37,45 @@ class GeneralizedPfleiderer(ABC):
         rhub = cell.rhub
         delta = cell.delta
         l = cell.l
-
         L = housing.L
 
-        urim = params["omega"]*rrim
+        self.urim = params["omega"]*rrim
 
         self.nu = rhub/rrim
         self.psi = 1.0
         self.zeta = L/l
-        self.epsilon = urim**2 / (2*g*Hsuc)
-        self.alpha = params["a"]/rrim
+        self.epsilon = self.urim**2 / (2*g*self.Hsuc)
         self.mu = 1 - s / (delta/2 * rrim**2 * (1-self.nu**2))
 
-        self.sigmad = self.sigma(params["alphadis"])
+        self.a = rrim - self.rifsuc(params["alphamax"]/2)
+        if self.a < 0:
+            msg = "Vane tip is not submerged into liquid surface for given model setup."
+            raise ValueError(msg)
+        self.alpha = self.a/rrim
 
         # Checking limits of the model
-        sigmamax = 2/3 * (self.epsilon*self.psi**2 + 1)
-        epsilonmin = 1/self.psi**2 * (3/2*self.sigmad - 1)
+        self.sigmamax = 2/3 * (self.epsilon * self.psi**2 + 1)
 
-        if self.epsilon < epsilonmin:
+        alphadis_max = newton(
+            lambda alpha:
+            self.sigmamax**3 * self.A(alpha)**2
+            - (self.epsilon*self.psi**2+1)*self.sigmamax**2 * self.A(alpha)**2
+            + self.epsilon,
+            3/4*params["alphamax"])
 
-            msg = (
-                "Value of velocity coefficient falls outside of the model limits.\n" +
-                f"Min. acceptable value is {epsilonmin}, but model parameters " +
-                f"produce {self.epsilon}.\nConsider increasing suction pressure or " +
-                "increasing circumferential velocity.")
+        if params["alphadis"] > alphadis_max:
 
-            raise ValueError(msg)
+            alpha_given = np.rad2deg(params["alphadis"])
+            alpha_possible = np.rad2deg(alphadis_max)
 
-        if self.sigmad > sigmamax:
-
-            msg = (
-                "Value of overall pressure ratio falls outside of the model limits.\n" +
-                f"Max. acceptable value is {sigmamax}, but model parameters " +
-                f"produce {self.sigmad}.\nConsider increasing velocity coefficient or " +
-                "psi coefficient of the vane.")
+            msg = "Value of discharge angle exceeds limits of the model: "\
+                f"current discharge angle is {alpha_given:.2f} (deg), "\
+                f"though with given parameters only ~{alpha_possible:.2f} (deg) "\
+                "is permitted within model application range."
 
             raise ValueError(msg)
+
+        self.sigmad = self.sigma(params["alphadis"])
 
     @abstractmethod
     def S(self, alpha):
@@ -132,20 +131,31 @@ class GeneralizedPfleiderer(ABC):
         ones = np.ones_like(alpha)
         zeros = np.zeros_like(alpha)
         coeffs = np.array([  # ascending power order!
-            self.epsilon/self.A(alpha)**2,
+            self.epsilon*ones,
             zeros,
-            -(self.epsilon*self.psi**2 + 1)*ones,
-            ones,
+            - self.A(alpha)**2 * (self.epsilon*self.psi**2 + 1),
+            self.A(alpha)**2,
         ]).T
 
         sigma = []
         for c in coeffs:
             r = polyroots(c)
-            r = np.real(r[np.isreal(r)])
-            sigma.append(np.min(r))
+            sigma.append(r[1])
         sigma = np.array(sigma).flatten()
 
         return sigma
+
+    def alphasuc(self, n: int = NUM_REGION_POINTS):
+        """Provides n angular coordinates belonging to suction region."""
+        return np.linspace(0, self._params["alphamax"]/2, n)
+
+    def alphacom(self, n: int = NUM_REGION_POINTS):
+        """Provides n angular coordinates belonging to compression region."""
+        return np.linspace(self._params["alphamax"]/2, self._params["alphadis"], n)
+
+    def alphadis(self, n: int = NUM_REGION_POINTS):
+        """Provides n angular coordinates belonging to discharge region."""
+        return np.linspace(self._params["alphadis"], self._params["alphamax"], n)
 
     def rifsuc(self, alpha):
         """Returns radius-vector of the interface for given rotational angle in the
@@ -191,32 +201,41 @@ class GeneralizedPfleiderer(ABC):
 
         return rifd
 
-    def rif(self, alpha):
-        """Returns radius-vector of the interface for given rotational angle.
-        Resolves regions (suction, compression, discharge) internally, makes call to
-        respective methods to compute radius-vectors for each region."""
+    def interfaceRPHI(self, n: int = NUM_REGION_POINTS):
+        """Provides polar interface coordinates (r, alpha). Uses coordinate providers
+        and profile methods under the hood."""
 
-        alphamax = self._params["alphamax"]
-        alphadis = self._params["alphadis"]
-        alphamid = alphamax/2
+        alphasuc = self.alphasuc(n)
+        alphacom = self.alphacom(n+1)[1:]
+        alphadis = self.alphadis(n+1)[1:]
 
-        suc = (alpha >= 0) * (alpha < alphamid)
-        com = (alpha >= alphamid) * (alpha < alphadis)
-        dis = (alpha >= alphadis) * (alpha <= alphamax)
+        alpha = np.concatenate((
+            alphasuc,
+            alphacom,
+            alphadis))
 
-        rif = np.concatenate(
-            (self.rifsuc(alpha[suc]),
-             self.rifcom(alpha[com]),
-             self.rifdis(alpha[dis]))
-        )
+        rif = np.concatenate((
+            self.rifsuc(alphasuc),
+            self.rifcom(alphacom),
+            self.rifdis(alphadis)))
 
-        return rif
+        return rif, alpha
+
+    def interfaceXY(self, n: int = NUM_REGION_POINTS):
+        """Provides cartesion interface coordinates (x, y). Uses interfaceRPHI and
+        transform.rphi_to_xy under the hood."""
+
+        return transform.rphi_to_xy(*self.interfaceRPHI(n))
 
 
-class ClassicPfleiderer(GeneralizedPfleiderer):
+class PGRClassic(PGRGenralized):
+    """Represents classic Pfleiderer-Golovincov-Rumyancev 1D model for interface
+    reconstruction in liquid ring machine.
+
+    Supports only single acting machines with cylindrical housings."""
 
     def __init__(self, cell: ImpellerCell, housing: CylindricalHousing,
-                 params: PfleidereModelParams) -> None:
+                 params: PGRParams) -> None:
 
         if not (isinstance(housing, CylindricalHousing)):
             raise ValueError(
@@ -243,7 +262,11 @@ class ClassicPfleiderer(GeneralizedPfleiderer):
         return self._housing.Rc - self.housR(alpha)
 
 
-class ModifiedPfleiderer(GeneralizedPfleiderer):
+class PGRModified(PGRGenralized):
+    """Represents modified Pfleiderer-Golovincov-Rumyancev 1D model for interface
+    reconstruction in liquid ring machine.
+
+    Supprots single and double acting liquid ring machines with arbitrary profile."""
 
     def R(self, alpha):
         return self._housing.R(alpha-np.pi)
@@ -252,6 +275,20 @@ class ModifiedPfleiderer(GeneralizedPfleiderer):
         return self.R(alpha) - self._cell.rrim
 
 
-# I think implementation could be generalized even further to accept custom
-# hydraulic losses model, but let's not rush with it for now,
-# maybe if I have enough time...
+# NOTE : On latest debugging (commits around 16.09.26)
+#        well, it works now, but stuff is incredibly messy, would not hurt to refine
+#        implementation, allow different strategies of model application, add convenience
+#        functions to infer some parameters when others are fixed etc etc.
+#
+# NOTE : currently operational parameters and port edges are passed
+#        in common dictionary, probably not the most elegant approach,
+#        but it was fast in terms of implementation. I'll fix it later,
+#        when I'll have more time for this.
+#
+# NOTE : I think implementation could be generalized even further to accept custom
+#        hydraulic losses model, but let's not rush with it for now, maybe if I have
+#        enough time...
+#
+# NOTE : checking for max. possible discsharge angle and vanes submersion directly during
+#        object creation is not the most gracefull thing either, should encapsulate
+#        validation checks in separate ("_private"?) method.
