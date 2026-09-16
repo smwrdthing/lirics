@@ -269,7 +269,7 @@ class PGRModified(PGRGenralized):
     Supprots single and double acting liquid ring machines with arbitrary profile."""
 
     def R(self, alpha):
-        return self._housing.R(alpha-np.pi)
+        return self._housing.R(alpha-self._params["alphamax"]/2)
 
     def S(self, alpha):
         return self.R(alpha) - self._cell.rrim
