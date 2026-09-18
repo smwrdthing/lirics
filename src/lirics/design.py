@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from lirics import transform
 from lirics import calculus
@@ -37,7 +37,7 @@ class ImpellerCell(ABC):
 
     A: float = field(init=False)
     V: float = field(init=False)
-    avmu: float = field(init=False)
+    avmu: NDArray | float = field(init=False)
 
     def __post_init__(self):
 

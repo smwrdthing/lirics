@@ -56,7 +56,7 @@ def pave_radial_path(
 def pave_angular_path(
         start: polarCoordinates,
         stop: polarCoordinates,
-        n=NUM_OF_PATH_POINTS) -> tuple[Numeric, Numeric]:
+        n=NUM_OF_PATH_POINTS) -> tuple[NDArray, NDArray]:
     """Generates (r,phi) points conformal to arch. Arch radius is read from start
     point, stop point radius is not used."""
 

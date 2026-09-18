@@ -6,7 +6,8 @@ from numpy.typing import NDArray
 import numpy as np
 from scipy.constants import g
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
-from scipy.optimize import fsolve, newton, brentq
+from scipy.optimize import newton
+from scipy.integrate import quad
 
 from lirics import calculus
 from lirics import grid
@@ -326,100 +327,113 @@ class RotatingField:
 
 class StationaryField(ABC):
 
-    # NOTE : maybe a usefull idea
-    #        we could precompute all points here with known step,
-    #        I wonder what prosprects this framework would open
-
-    # NOTE : insight
-    #        Cubic equation in average velocity is possible to derive,
-    #        but not in the form I was expecting before
-    #
-    #        lamP does not automatically follows from lamW, but it is
-    #        possible to express lamP*lamW via quantities which
-    #        are defined by fixed lamW. This leads to cubic equation
-    #        in average W.
-    #
-    #        I still have some concerns on coupling and consistency
-    #        of fixing lamW. For example fixed linear profile makes
-    #        no sense for straight cells, because average velocity
-    #        is instantly defined by tangent velocity on the rim, which
-    #        is constant, so we get constant average velocity across
-    #        sections automatically.
-    #
-    #        Day was long, I guesse I just need to sleep on this,
-    #        one happy sunny day I will defend this PhD and rest
-    #        calmly
-
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
 
-        # We hold parameters for three radial sections for calculations
-        # of fluid flow in stationary domain of liquir-ring machine:
-        # middle, back and front, thus [0.0]*3 things
-
         # Sectors geometrical parameters
-        self.dphi = cell.phi(cell.rrim)
-        self.alpha = [0.0]*3
-        self.r = cell.rhub
-        self.delta = cell.delta
-        self.R = [0.0]*3  # sectors radial bounds
-        self.S = [0.0]*3  # sectors radial span
-        self.RH = housing.R
+        self.R = housing.R
+        self.r = cell.rrim
 
-        # Flow parameters
-        self.avPSI = [0.0]*3  # potential field contribution
-        self.avW = [0.0]*3  # velocity contribution
-        self.Prim = [0.0]*3  # rim pressure
-        self.avP = [0.0]*3  # pressure contribution
-        self.avJ = [0.0]*3  # overall energy flux
+        # NOTE : dphi must be added every time we pass alpha / automation?
+        self.dphi = cell.phi(cell.rrim)
+        self.delta = cell.delta
+
+    def S(self, alpha):
+        """Computes out-of-impeller region thickness for given rotational angle."""
+        return self.R(alpha) - self.r
+
+    def avR(self, alpha):
+        """Computes average radial coordinate in the out-of-impeller region
+        for given rotational angle."""
+        return 0.5*(self.R(alpha) + self.r)
 
     @abstractmethod
-    def lamW(self):
+    def lamW(self, R, alpha):
+        """Represents velocity distribution in radial section of the out-of-impeller
+        region. By definition:
+
+                                    lamW = avW / W
+
+        This distribution must be defined to close system of equations. Thus different
+        models are distinguished by different shapes of velocity profile in the out-of
+        impeller region of liquid ring machine.
+
+        ! Important : some velocity profiles will produce blatantly wrong results;
+                      for example linear velocity profile will yield constant tangent
+                      velocity of the flow for all rotational angles when considering
+                      straight-midline cell, which clearly does not make much sense
+
+        Other than that, the only mathematical restriction for this function, followng
+        definition, is that it's average value must always yield 1."""
+
         raise
 
-    def lamCF(self):
-        pass
+    def lamPsi(self, R, alpha):
+        """Represents potential field related specific flow energy distribution in radial
+        section of the out-of-impeller region.
 
-    def lamP(self):
-        pass
+        Curent implementation implies specific orientation of the machine in space,
+        more gemeral approach would be introducing i.e. housing tilt"""
 
-    def lamPsi(self):
-        pass
+        gR0 = g*self.R(0)
 
-    def lamJ(self):
-        pass
+        Psi = gR0 - g*R*np.cos(alpha)
+        avPsi = gR0 - g*self.avR(alpha)*np.cos(alpha)
 
-    def avlamW3(self):
-        pass
+        return Psi/avPsi
 
-    def avlamWP(self):
-        pass
+    def lamCF(self, R, alpha):
+        """Represents function that relates centrifugal force-field related pressure
+        contribution and average velocity in the radial section. Computed numerically
+        with defined lamW. Could be overriden for optimisation purposes or specific
+        analytical definition of lamW."""
 
-    def avlamWPsi(self):
-        pass
+        # trapezoid / cumulative trapezoid integration will be faster, but quad is easier
+        # to code, we can start with quad to convey the idea and then turn to trapezoid
 
-    def avlamWJ(self):
-        pass
+        return quad(lambda x: self.lamW(x, alpha)**2/x, self.r, R)
+
+    def kWPsi(self, alpha):
+        """Compmutes average for convolution-like integral for velocity profile shape and
+        specific potential-field related energy of the flow. Determines coefficent in the
+        cubic equation in average velocity."""
+
+        integral = quad(
+            lambda x: self.lamW(x, alpha)*self.lamPsi(x, alpha),
+            self.r, self.R(alpha))
+
+        return integral[0]/self.S(alpha)
+
+    def kWCF(self, alpha):
+        """Compmutes average for convolution-like integral for velocity profile shape and
+        centrifugal-field related pressure contribution. Determines coefficent in the
+        cubic equation in average velocity."""
+
+        integral = quad(
+            lambda x: self.lamW(x, alpha)*self.lamCF(x, alpha),
+            self.r, self.R(alpha))
+
+        return integral[0]/self.S(alpha)
+
+    def kW3(self, alpha):
+        """Compmutes average for integral of the cubed velocity profile shape function.
+        Determines coefficent in the cubic equation in average velocity."""
+
+        integral = quad(
+            lambda x: self.lamW(x, alpha)**3,
+            self.r, self.R(alpha))
+
+        return integral[0]/self.S(alpha)
 
     def xi(self):
-        pass
-
-    def next(self, rotating_field: RotatingField):
-
-        mid = rotating_field.omega * rotating_field.t + self.dphi
-        half = self.delta/2
-        self.alpha = [mid - half, mid, mid + half]
-
-        for i, alpha in enumerate(self.alpha):
-            self.R[i] = self.RH(alpha)
-            self.S[i] = self.R[i] - self.r
-
-    def propagate(self):
         pass
 
     def solve(
             self,
             rotating_field: RotatingField,
             prior_field: StationaryField):
+        pass
+
+    def propagate(self):
         pass
 
 
