@@ -4,6 +4,7 @@ from typing import Callable
 from numpy.typing import NDArray
 
 import numpy as np
+from numpy.polynomial.polynomial import polyroots, polyval
 from scipy.constants import g
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
 from scipy.optimize import newton
@@ -21,6 +22,7 @@ type ScipyInterpolator = Callable[[tuple[NDArray, NDArray]], NDArray]
 
 
 BACK_PHI_CORRECTION = np.deg2rad(0.5)
+NUM_INTEGRATION = 100
 
 # Container access keys
 HUB = 0
@@ -329,6 +331,9 @@ class StationaryField(ABC):
 
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
 
+        self._cell = cell
+        self._housing = housing
+
         # Sectors geometrical parameters
         self.R = housing.R
         self.r = cell.rrim
@@ -336,6 +341,15 @@ class StationaryField(ABC):
         # NOTE : dphi must be added every time we pass alpha / automation?
         self.dphi = cell.phi(cell.rrim)
         self.delta = cell.delta
+
+        self.alpha = 0
+
+        self.rho = 0
+        self.Pr = 0
+
+        self.avPsi = 0
+        self.avP = 0
+        self.avW = 0
 
     def S(self, alpha):
         """Computes out-of-impeller region thickness for given rotational angle."""
@@ -381,7 +395,7 @@ class StationaryField(ABC):
 
         return Psi/avPsi
 
-    def lamCF(self, R, alpha):
+    def lamCF(self, R, alpha, n=NUM_INTEGRATION):
         """Represents function that relates centrifugal force-field related pressure
         contribution and average velocity in the radial section. Computed numerically
         with defined lamW. Could be overriden for optimisation purposes or specific
@@ -390,42 +404,53 @@ class StationaryField(ABC):
         # trapezoid / cumulative trapezoid integration will be faster, but quad is easier
         # to code, we can start with quad to convey the idea and then turn to trapezoid
 
-        return quad(lambda x: self.lamW(x, alpha)**2/x, self.r, R)
+        x = np.linspace(self.r, R, n)
+        integral = np.trapezoid(self.lamW(x, alpha)**2/x, x, axis=0)
 
-    def kWPsi(self, alpha):
+        return integral
+
+    def kWPsi(self, alpha, n=NUM_INTEGRATION):
         """Compmutes average for convolution-like integral for velocity profile shape and
         specific potential-field related energy of the flow. Determines coefficent in the
         cubic equation in average velocity."""
 
-        integral = quad(
-            lambda x: self.lamW(x, alpha)*self.lamPsi(x, alpha),
-            self.r, self.R(alpha))
+        x = np.linspace(self.r, self.R(alpha), n)
+        integral = np.trapezoid(self.lamW(x, alpha)*self.lamPsi(x, alpha), x)
 
-        return integral[0]/self.S(alpha)
+        return integral/self.S(alpha)
 
-    def kWCF(self, alpha):
+    def kWCF(self, alpha, n=NUM_INTEGRATION):
         """Compmutes average for convolution-like integral for velocity profile shape and
         centrifugal-field related pressure contribution. Determines coefficent in the
         cubic equation in average velocity."""
 
-        integral = quad(
-            lambda x: self.lamW(x, alpha)*self.lamCF(x, alpha),
-            self.r, self.R(alpha))
+        x = np.linspace(self.r, self.R(alpha), n)
+        integral = np.trapezoid(self.lamW(x, alpha)*self.lamCF(x, alpha), x)
 
-        return integral[0]/self.S(alpha)
+        return integral/self.S(alpha)
 
-    def kW3(self, alpha):
+    def kWWW(self, alpha, n=NUM_INTEGRATION):
         """Compmutes average for integral of the cubed velocity profile shape function.
         Determines coefficent in the cubic equation in average velocity."""
 
-        integral = quad(
-            lambda x: self.lamW(x, alpha)**3,
-            self.r, self.R(alpha))
+        x = np.linspace(self.r, self.R(alpha), n)
+        integral = np.trapezoid(self.lamW(x, alpha)**3, x, axis=0)
 
-        return integral[0]/self.S(alpha)
+        return integral/self.S(alpha)
 
     def xi(self):
         pass
+
+    def coeffs(self, alpha):
+
+        c = np.array([
+            0,  # W^0 / should be based on prior field values
+            (self.kWPsi(alpha)*self.avPsi + self.Pr/self.rho)*self.S(alpha),  # W^1
+            0,  # W^2
+            (self.kWCF(alpha) + self.kWWW(alpha)/2)*self.S(alpha)  # W^3
+        ])
+
+        return c
 
     def solve(
             self,
