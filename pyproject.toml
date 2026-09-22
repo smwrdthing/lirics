@@ -25,7 +25,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Amir Aslanov", email = "amiraslanov16@gmail.com" }]
 maintainers = [{ name = "Amir Aslanov", email = "amiraslanov16@gmail.com" }]
 
-requires-python = ">= 3.13"
+requires-python = ">= 3.12"
 dependencies = ["numpy", "scipy", "matplotlib"]
 
 dynamic = ["version"]
