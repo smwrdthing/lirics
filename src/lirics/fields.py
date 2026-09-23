@@ -24,7 +24,7 @@ type ScipyInterpolator = Callable[[tuple[NDArray, NDArray]], NDArray]
 BACK_PHI_CORRECTION = np.deg2rad(0.5)
 NUM_INTEGRATION = 100
 
-_SENTINTEL = -1
+_SENTINTEL = -1.0
 
 # Container access keys
 HUB = 0
@@ -78,12 +78,17 @@ class CellField:
         self.pV = np.nan
         self.VV = np.nan
         self.TV = np.nan
+        self.rhoV = np.nan
+        self.nV = np.nan
+        self.mV = np.nan
+        self.GV = np.nan
+        self.RV = np.nan
 
         self.VL = VL
         self.actualVL = np.nan
 
         # Considered flow is incompressible, so density "field" is constant
-        self.rho = rho
+        self.rhoL = rho
 
         # Field exists in time and space
         self.omega = omega
@@ -107,6 +112,7 @@ class CellField:
         self.dpdphi = np.zeros_like(self.r)
 
         self.dprim = np.zeros_like(self.phi[RIM])
+        self.prim = np.zeros_like(self.phi[RIM])
 
         # Attributes to hold interface points
         self.rif = np.zeros_like(self.phi[RIM])
@@ -148,7 +154,7 @@ class CellField:
 
         omega_t = self.omega * self.t
 
-        self.dpdr = self.rho * (
+        self.dpdr = self.rhoL * (
             g * np.cos(omega_t + self.phi) -
             (
                 self.dudt
@@ -159,7 +165,7 @@ class CellField:
             )
         )
 
-        self.dpdphi = - self.rho * self.r * (
+        self.dpdphi = - self.rhoL * self.r * (
             g * np.sin(omega_t + self.phi) +
             (
                 self.dwdt
@@ -324,9 +330,12 @@ class CellField:
 
         # At this point interface and liquid vof are resolved, so we can
         # compute vapor properties and then pressure on the rim
-        # self.VV = self.V - self.VL
-        # self.pV = self.TV
-        # ...
+        self.VV = self.V - self.VL
+        self.mV = starred.mV + starred.GV*(self.t-starred.t)
+        self.rhoV = self.mV/self.VV
+        self.pV = starred.pV * (starred.VV/self.VV)**self.nV
+        self.TV = self.pV / (self.rhoV*self.RV)
+        self.prim = self.pV + self.dprim
 
 
 class FreeField(ABC):
@@ -362,6 +371,16 @@ class FreeField(ABC):
         self.avPsi = _SENTINTEL
         self.avP = _SENTINTEL
         self.avW = _SENTINTEL
+
+        # Back field section-averaged necessary parameters
+        self.avWB = _SENTINTEL
+        self.QB = _SENTINTEL
+        self.GB = _SENTINTEL
+
+        # Front field section-averaged necessary parameters
+        self.avWF = _SENTINTEL
+        self.QF = _SENTINTEL
+        self.GF = _SENTINTEL
 
         self.roots = np.full((1, 3), _SENTINTEL)  # Cubic equation -> 3 roots
 
@@ -432,15 +451,15 @@ class FreeField(ABC):
         with defined lamW. Could be overriden for optimisation purposes or specific
         analytical definition of lamW."""
 
-        # trapezoid / cumulative trapezoid integration will be faster, but quad is easier
-        # to code, we can start with quad to convey the idea and then turn to trapezoid
-
         x = np.linspace(self.r, R, n)
         integral = np.trapezoid(self.lamW(x, alpha)**2/x, x, axis=0)
 
         return integral
 
     def lamf(self, R, alpha):
+        """Represents friction loss distribution along radial section in the free flow
+        region. Base class stipulates uniform loss distribution."""
+
         return 1
 
     def kWPsi(self, alpha, n=NUM_INTEGRATION):
@@ -466,6 +485,9 @@ class FreeField(ABC):
         return integral/self.S(alpha)
 
     def kWf(self, alpha, n=NUM_INTEGRATION):
+        """Compmutes average for convolution-like integral for velocity profile shape and
+        friction-related energy loss. Determines coefficent in the cubic equation in
+        average velocity."""
 
         x = np.linspace(self.r, self.R(alpha), n)
         integral = np.trapezoid(
@@ -483,6 +505,17 @@ class FreeField(ABC):
         return integral/self.S(alpha)
 
     def xi(self, alpha, dalpha):
+        """Represents energy loss coefficient in the Darcy-Weisbach equation.
+        Current implementation is after Raizman et al. Blends friction and local
+        duct change contributions.
+
+        Friction contribution is determined as ususall for the circular pipe with
+        hydraulic diameter of rectangular duct formed by radial sections of the
+        free flow region. Length is computed as arch-length for average section radius
+        and specified angular shift.
+
+        Local contribution is determined as proposed by Abramovich.
+        (see Raizman's mmonograph and Idelchik's hydraulic loss handbook for details)."""
 
         r = self.r
         L = self.L
@@ -516,6 +549,14 @@ class FreeField(ABC):
         return xi
 
     def coeffs(self, alpha):
+        """Partially fills coefficients for cubic equation of the free field model.
+        Omits rhs completely, namely :
+             > starred field contribution
+             > coupled field contribution
+             > friction contribution.
+
+        Said contributions are augmented into coefficients array during solution
+        procedure."""
 
         c = np.array([
             0,  # W^0 / should be based on prior field values
@@ -528,11 +569,43 @@ class FreeField(ABC):
 
     @abstractmethod
     def updateWmodel(self, starred: FreeField, coupled: CellField):
+        """Updates necessary parameters for velocity shape model (if any presented).
+        Different models might propose different set of parameters, depending on
+        different factors, to keep solution algorithm generic this separate function
+        handles model parameters renewal.
+
+        This function is called prior to anything in solve(). Thus to specify W-shape
+        model user must:
+            > introduce new attributes to record model parameters in inheriting class
+            > override updateWmodel so that it handles parameters renewal wrt starred
+              and coupled fields
+            > use introduced model parameters to override lamW()
+
+        Primary hunch is that W-shape model would mainly depend on parameters of starred
+        (prior) free field and current coupled cell field, thus generic signature call."""
+
         return
 
     def solve(self, starred: FreeField, coupled: CellField):
+        """Solves flow in the free-flow region of the liquid ring machine.
+
+        Section-averaged parameters are determined as a solution of the main cubic
+        equation of the model describing flow energy evolution in the free region.
+
+        When averaged parameters are resolved - distributed parameters could be
+        restored with aid of the defined distribution functions.
+
+        To finalize computation procedure resolved section-averaged parameters are
+        propagated to back ann front boundaries of the dynamic domain. Propagation
+        algorithm assumes that Bernoulli's principle is satisfied locally within the cell.
+        Then propagated parameters are used to determine residual of the mass balance
+        equation. Minimization of that residual constitutes field-coupled computation
+        procedure for cell and free field in the liquid ring machines.
+        """
 
         self.updateWmodel(starred, coupled)
+
+        self.alpha = coupled.alpha
 
         alphar = self.alpha + self.dphi
         astalphar = starred.alpha + starred.dphi
@@ -580,13 +653,59 @@ class FreeField(ABC):
         # Now it is possible to set section-average values
         self.avW = positive_real_root
         self.avP = Pr + self.rho*self.avW**2 * self.kWCF(alphar)
-        self.avPsi = gR0 - g*self.r*np.cos(alphar)
+        self.avPsi = gR0 - g*self.avR(alphar)*np.cos(alphar)
 
         # Further course of action is to propagate parameters to boundaries of the
         # considred domain. Then results must be passed to mass imbalance check
+        self.propagate(coupled)
+        self.boundary_flow()
 
-    def propagate(self):
-        pass
+    def propagate(self, coupled: CellField):
+
+        # NOTE : some quick dirty code here, should rewrite
+
+        alphar = self.alpha+self.dphi
+        alphab = (alphar-self.delta/2,
+                  alphar+self.delta/2)
+        gR0 = g*self.R(0)
+
+        kWCF = self.kWCF(alphar)
+
+        Wb = []
+        for alpha, key in zip(alphab, (BACK, FRONT)):
+
+            kWCFb = self.kWCF(alphab)
+            avPsib = gR0 - g*self.avR(alpha)*np.cos(alpha)
+            Prb = coupled.prim[RIM, key]
+
+            dPsi = self.avPsi - avPsib
+            dPr = self.Pr - Prb
+
+            Wb.append(
+                np.sqrt(
+                    1/(kWCFb+1/2) * (dPsi + dPr/self.rho +
+                                     (kWCF + 1/2)*self.avW**2)
+                )
+            )
+
+        # Unpacking values to attributes
+        self.avWB, self.avWF = Wb
+
+    def boundary_flow(self):
+
+        alphar = self.alpha+self.dphi
+        alphab = (alphar-self.delta/2,
+                  alphar+self.delta/2)
+
+        avWb = self.avWB, self.avWF
+        Qb = []
+        Gb = []
+        for alpha, avW in zip(alphab, avWb):
+            Qb.append(self.S(alpha)*self.L*avW)
+            Gb.append(Qb[-1]*self.rho)
+
+        self.QB, self.QF = Qb
+        self.GB, self.GF = Gb
 
     def Psi(self, R, alpha):
         """Computes potential-field related energy contribution.
@@ -611,6 +730,9 @@ class FreeField(ABC):
 
 class UniformFreeField(FreeField):
 
+    def updateWmodel(self, starred: FreeField, coupled: CellField):
+        return
+
     def lamW(self, R, alpha):
         return np.ones_like(R)
 
@@ -624,8 +746,10 @@ class LinearFreeFiled(FreeField):
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
-        S = self.S(self.alpha)
-        R = self.R(self.alpha)
+        alphar = self.alpha + self.dphi
+
+        S = self.S(alphar)
+        R = self.R(alphar)
 
         self.k = -2/S
         self.b = 2/S*R
@@ -650,10 +774,12 @@ class QuadFreeField(FreeField):
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
+        alphar = self.alpha + self.dphi
+
         Wr = coupled.w[RIM, ANY] + coupled.omega*self.r
         r = self.r
-        R = self.R(self.alpha)
-        S = self.S(self.alpha)
+        R = self.R(alphar)
+        S = self.S(alphar)
 
         Rp = self.Rp
         dWdRp = self.dWdRp
@@ -670,6 +796,14 @@ class QuadFreeField(FreeField):
         lamW = (a*R**2 + b*R + c) / (a/3*S**2 + b/2*S + c)
 
         return lamW
+
+
+def imbalance(cell_field: CellField, free_field: FreeField):
+    # Function to compute mass imbalance of the overall solution step
+    pass
+
+
+# Auxiliary functions
 
 
 def pathinterp(
