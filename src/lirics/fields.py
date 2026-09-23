@@ -337,6 +337,8 @@ class FreeField(ABC):
         self._housing = housing
 
         # Sectors geometrical parameters
+        self.epsilon = 0  # housing wall roughness
+        self.L = housing.L
         self.R = housing.R
         self.r = cell.rrim
 
@@ -353,6 +355,8 @@ class FreeField(ABC):
         self.alpha = _SENTINTEL
 
         self.rho = _SENTINTEL
+        self.mu = _SENTINTEL
+
         self.Pr = _SENTINTEL
 
         self.avPsi = _SENTINTEL
@@ -364,6 +368,15 @@ class FreeField(ABC):
     def S(self, alpha):
         """Computes out-of-impeller region thickness for given rotational angle."""
         return self.R(alpha) - self.r
+
+    def hydD(self, alpha):
+        """Computes hydraulic diameter of the radial section in the free region."""
+
+        L = self.L
+        S = self.S(alpha)
+        Dh = 4*L*S / (L+2*S)
+
+        return Dh
 
     def avR(self, alpha):
         """Computes average radial coordinate in the out-of-impeller region
@@ -469,8 +482,38 @@ class FreeField(ABC):
 
         return integral/self.S(alpha)
 
-    def xi(self):
-        pass
+    def xi(self, alpha, dalpha):
+
+        r = self.r
+        L = self.L
+        epsilon = self.epsilon
+
+        Dh = self.hydD(alpha)
+        avR = self.avR(alpha)
+        avS = (self.S(alpha)+self.S(alpha+dalpha))/2
+
+        Re = self.Re(alpha)
+
+        # Friction contribution
+        # NOTE : more complicated friction factor correlation could be used,
+        #        consider adjusting this
+        f = 0.1 * (1.46*self.epsilon/Dh + 100/Re)**0.25
+        xif = f * avR/Dh * dalpha
+
+        # Local contribution
+        A = 0.445
+        B = 0.21 / (r/Dh)**(2.5*(r/Dh < 1.0) + 0.5*(r/Dh >= 1.0))
+        C = (L/avS/2)**0.95 * (L/avS/2 < 3) + \
+            0.223*(L/avS/2)**0.448 * (L/avS/2 >= 3)
+
+        kRe = 20.3/Re**0.25 * (Re < 2e5) + 1 * (Re >= 2e5)
+        kEps = 1 * (Re <= 4e4) + (1+epsilon/Dh*2e6) * (Re > 4e4)
+
+        xil = kEps * kRe * A * B * C
+
+        xi = xif + xil
+
+        return xi
 
     def coeffs(self, alpha):
 
@@ -485,30 +528,30 @@ class FreeField(ABC):
 
     def solve(self, starred: FreeField, coupled: CellField):
 
-        alpha = self.alpha + self.dphi
-        astalpha = starred.alpha + starred.dphi
-        dalpha = alpha - astalpha
+        alphar = self.alpha + self.dphi
+        astalphar = starred.alpha + starred.dphi
+        dalpha = alphar - astalphar
 
         gR0 = g*self.R(0)  # for Psi conputations
 
-        c = self.coeffs(alpha)
+        c = self.coeffs(alphar)
 
         # Starred fixed field contribution
-        c[0] -= polyval(starred.avW, starred.coeffs(astalpha))
+        c[0] -= polyval(starred.avW, starred.coeffs(astalphar))
 
         # Coupled rotating field contribution
         Ur = coupled.u[RIM, ANY]
         Wr = coupled.w[RIM, ANY] + coupled.omega*coupled.r[RIM, ANY]
         Pr = coupled.pV + np.interp(self.dphi, coupled.phi[RIM], coupled.dprim)
-        Psir = gR0 - g*self.r*np.cos(alpha)
+        Psir = gR0 - g*self.r*np.cos(alphar)
         Jr = Psir + Pr/self.rho + (Ur**2 + Wr**2)/2
         c[0] -= Ur*Jr*self.r*dalpha
         # TODO : Extend CellField class to handle proper vapor parameters computations
 
         # Friction contribution
-        astkWf = starred.kWf(astalpha)
-        astxi = starred.xi()  # TODO : this must be defined
-        astS = starred.S(astalpha)
+        astkWf = starred.kWf(astalphar)
+        astxi = starred.xi(self.alpha, dalpha)
+        astS = starred.S(astalphar)
         c[0] -= astkWf*astxi/2*astS * starred.avW**3
 
         self.roots = polyroots(c)  # roots of main equation
@@ -530,25 +573,52 @@ class FreeField(ABC):
 
         # Now it is possible to set section-average values
         self.avW = positive_real_root
-        self.avP = Pr + self.rho*self.avW**2 * self.kWCF(alpha)
-        self.avPsi = gR0 - g*self.r*np.cos(alpha)
+        self.avP = Pr + self.rho*self.avW**2 * self.kWCF(alphar)
+        self.avPsi = gR0 - g*self.r*np.cos(alphar)
 
         # Further course of action is to propagate parameters to boundaries of the
-        # considred domain. Then results nust be passed to mass imbalance check
+        # considred domain. Then results must be passed to mass imbalance check
 
     def propagate(self):
         pass
 
+    def Psi(self, R, alpha):
+        """Computes potential-field related energy contribution.
+        Uses average value and distribution function under the hood."""
+        return self.avPsi * self.lamPsi(R, alpha)
+
+    def W(self, R, alpha):
+        """Computes flow velocity.
+        Uses average value and distribution function under the hood."""
+        return self.avW * self.lamW(R, alpha)
+
+    def P(self, R, alpha):
+        """Computes flow pressure.
+        Uses average value and distribution function under the hood."""
+        return self.Pr + self.rho * self.avW**2 * self.lamW(R, alpha)
+
+    def Re(self, alpha):
+        return self.avW * self.hydD(alpha) * self.rho / self.mu
+
 
 # Some fresh ideas further
 
+class UniformFreeField(FreeField):
+
+    def lamW(self, R, alpha):
+        return np.ones_like(R)
+
 
 class LinearFreeFiled(FreeField):
-    pass
+
+    def lamW(self, R, alpha):
+        return k*R+b
 
 
 class QuadraticFreeField(FreeField):
-    pass
+
+    def lamW(self, R, alpha):
+        return a*R**2 + b*R + c
 
 
 def pathinterp(
