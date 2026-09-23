@@ -172,8 +172,9 @@ dt = dalpha/omega
 for i, (alph, rref) in enumerate(zip(alphadata, rifdata)):
     print(f"Capturing interface in the cell {i}")
 
-    prior = fields.RotatingField(cell, shape, VLfit(alph-dalpha), rho, omega)
-    field = fields.RotatingField(cell, shape, VLfit(alph), rho, omega)
+    prior = fields.CellField(
+        cell, shape, VLfit(alph-dalpha), rho, omega)
+    field = fields.CellField(cell, shape, VLfit(alph), rho, omega)
 
     prior.alpha = alph-dalpha
     prior.t = prior.alpha/omega

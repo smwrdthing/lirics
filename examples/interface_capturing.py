@@ -32,10 +32,10 @@ VLstar = 3e-4
 Q = 5e-3
 dVL = Q*DT
 VL = VLstar+dVL
-old_cell_field = fields.RotatingField(
+old_cell_field = fields.CellField(
     cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VLstar, DENSITY, OMEGA
 )
-cell_field = fields.RotatingField(
+cell_field = fields.CellField(
     cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VL, DENSITY, OMEGA)
 
 # Fields computation

@@ -33,8 +33,8 @@ MID = 1
 ANY = -1
 
 
-class RotatingField:
-    """Class for representation of the flow filed in the impeller cell of the
+class CellField:
+    """Class for representation of the flow field in the impeller cell of the
     liquid ring machine.
 
     Field class handles flow field-related data management and is responsible for
@@ -114,24 +114,24 @@ class RotatingField:
         self.phicorr = np.zeros_like(self.phi[RIM])
         self.phicorr[0] = BACK_PHI_CORRECTION
 
-    def U(self, prior: RotatingField):
+    def U(self, starred: CellField):
         """Calculates velocity field components with volumetric flow rate computed
         from backward derivative approximation for liquid volume and cell midline
         tangency assumption."""
 
-        dVL = self.VL - prior.VL
-        dt = self.t - prior.t
+        dVL = self.VL - starred.VL
+        dt = self.t - starred.t
 
         self.u = - 1 / self.Af * dVL / dt
         self.w = self.u * self.r * self.dphidr
 
-    def dUdt(self, prior: RotatingField):
+    def dUdt(self, starred: CellField):
         """Calclates temporal derivative of the velocity field with backward approximation
         of the dreivative and prior spatio-temporal field."""
 
-        dt = self.t - prior.t
-        self.dudt = (self.u - prior.u)/dt
-        self.dwdt = (self.w - prior.w)/dt
+        dt = self.t - starred.t
+        self.dudt = (self.u - starred.u)/dt
+        self.dwdt = (self.w - starred.w)/dt
 
     def dUdr(self):
         """Calculates spatial derivatives of the velocity field numerically
@@ -281,7 +281,7 @@ class RotatingField:
 
     def solve(
             self,
-            prior: RotatingField,
+            starred: CellField,
     ):
         """Implements solution algorithm for the flow field in the cell of the
         liquid ring machine. Sets new (guessed) value of liquid volume in the cell
@@ -303,9 +303,9 @@ class RotatingField:
         solver to formulate mass-balance residual-based procedure which will ensure
         correct VLnew for the cell."""
 
-        self.U(prior)
+        self.U(starred)
         self.dUdr()
-        self.dUdt(prior)
+        self.dUdt(starred)
         self.gradP()
 
         # Using newton optimizer from scipy cuts it, calls ro errvof lead to
@@ -327,7 +327,7 @@ class RotatingField:
         # ...
 
 
-class StationaryField(ABC):
+class FreeField(ABC):
 
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
 
@@ -415,7 +415,8 @@ class StationaryField(ABC):
         cubic equation in average velocity."""
 
         x = np.linspace(self.r, self.R(alpha), n)
-        integral = np.trapezoid(self.lamW(x, alpha)*self.lamPsi(x, alpha), x)
+        integral = np.trapezoid(
+            self.lamW(x, alpha) * self.lamPsi(x, alpha), x, axis=0)
 
         return integral/self.S(alpha)
 
@@ -425,7 +426,8 @@ class StationaryField(ABC):
         cubic equation in average velocity."""
 
         x = np.linspace(self.r, self.R(alpha), n)
-        integral = np.trapezoid(self.lamW(x, alpha)*self.lamCF(x, alpha), x)
+        integral = np.trapezoid(
+            self.lamW(x, alpha)*self.lamCF(x, alpha), x, axis=0)
 
         return integral/self.S(alpha)
 
@@ -454,8 +456,8 @@ class StationaryField(ABC):
 
     def solve(
             self,
-            rotating_field: RotatingField,
-            prior_field: StationaryField):
+            coupled: CellField,
+            starred: FreeField):
         pass
 
     def propagate(self):
@@ -465,11 +467,11 @@ class StationaryField(ABC):
 # Some fresh ideas further
 
 
-class LinearStationaryFiled(StationaryField):
+class LinearFreeFiled(FreeField):
     pass
 
 
-class QuadraticStationaryField(StationaryField):
+class QuadraticFreeField(FreeField):
     pass
 
 
