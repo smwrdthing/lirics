@@ -8,7 +8,6 @@ from numpy.polynomial.polynomial import polyroots, polyval
 from scipy.constants import g
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
 from scipy.optimize import newton
-from scipy.integrate import quad
 
 from lirics import calculus
 from lirics import grid
@@ -73,6 +72,8 @@ class CellField:
         self._cell = cell
 
         self.V = cell.V
+        self.phir = cell.phi(cell.rrim)
+        self.delta = cell.delta
 
         # Vapor parameters?
         self.pV = np.nan
@@ -85,7 +86,7 @@ class CellField:
         self.RV = np.nan
 
         self.VL = VL
-        self.actualVL = np.nan
+        self.actVL = np.nan
 
         # Considered flow is incompressible, so density "field" is constant
         self.rhoL = rho
@@ -270,7 +271,7 @@ class CellField:
 
         loop = np.hstack((interface, frontline, rimarch, backline))
 
-        self.actualVL = abs(
+        self.actVL = abs(
             cell.l * cell.avmu * calculus.areaGreenGauss(transform.rphi_to_xy(*loop)))
 
         return loop  # return looped path for debugging and test purposes
@@ -285,7 +286,7 @@ class CellField:
         self.capture_inteface(rref)
         self.evalvof()
 
-        return self.VL-self.actualVL
+        return self.VL-self.actVL
 
     def solve(
             self,
@@ -351,8 +352,8 @@ class FreeField(ABC):
         self.R = housing.R
         self.r = cell.rrim
 
-        # NOTE : dphi must be added every time we pass alpha / automation?
-        self.dphi = cell.phi(cell.rrim)
+        # NOTE : phir must be added every time we pass alpha / automation?
+        self.phir = cell.phi(cell.rrim)
         self.delta = cell.delta
 
         # NOTE : on field initialization
@@ -396,6 +397,17 @@ class FreeField(ABC):
         Dh = 4*L*S / (L+2*S)
 
         return Dh
+
+    def V(self, alpha, n=NUM_INTEGRATION):
+
+        delta = self.delta
+        alpha = np.linspace(alpha-delta/2, alpha+delta/2, n)
+
+        f = 1/2 * (self.R(alpha)**2 - self.r**2) * self.L
+
+        integral = np.trapezoid(f, alpha, axis=0)
+
+        return integral
 
     def avR(self, alpha):
         """Computes average radial coordinate in the out-of-impeller region
@@ -607,11 +619,11 @@ class FreeField(ABC):
 
         self.alpha = coupled.alpha
 
-        alphar = self.alpha + self.dphi
-        astalphar = starred.alpha + starred.dphi
+        alphar = self.alpha + self.phir
+        astalphar = starred.alpha + starred.phir
         dalpha = alphar - astalphar
 
-        gR0 = g*self.R(0)  # for Psi conputations
+        gR0 = g*self.R(0)  # for Psi computations
 
         c = self.coeffs(alphar)
 
@@ -621,7 +633,7 @@ class FreeField(ABC):
         # Coupled rotating field contribution
         Ur = coupled.u[RIM, ANY]
         Wr = coupled.w[RIM, ANY] + coupled.omega*coupled.r[RIM, ANY]
-        Pr = coupled.pV + np.interp(self.dphi, coupled.phi[RIM], coupled.dprim)
+        Pr = np.interp(self.phir, coupled.phi[RIM], coupled.prim)
         Psir = gR0 - g*self.r*np.cos(alphar)
         Jr = Psir + Pr/self.rho + (Ur**2 + Wr**2)/2
         c[0] -= Ur*Jr*self.r*dalpha
@@ -658,13 +670,12 @@ class FreeField(ABC):
         # Further course of action is to propagate parameters to boundaries of the
         # considred domain. Then results must be passed to mass imbalance check
         self.propagate(coupled)
-        self.boundary_flow()
 
     def propagate(self, coupled: CellField):
 
         # NOTE : some quick dirty code here, should rewrite
 
-        alphar = self.alpha+self.dphi
+        alphar = self.alpha+self.phir
         alphab = (alphar-self.delta/2,
                   alphar+self.delta/2)
         gR0 = g*self.R(0)
@@ -690,22 +701,6 @@ class FreeField(ABC):
 
         # Unpacking values to attributes
         self.avWB, self.avWF = Wb
-
-    def boundary_flow(self):
-
-        alphar = self.alpha+self.dphi
-        alphab = (alphar-self.delta/2,
-                  alphar+self.delta/2)
-
-        avWb = self.avWB, self.avWF
-        Qb = []
-        Gb = []
-        for alpha, avW in zip(alphab, avWb):
-            Qb.append(self.S(alpha)*self.L*avW)
-            Gb.append(Qb[-1]*self.rho)
-
-        self.QB, self.QF = Qb
-        self.GB, self.GF = Gb
 
     def Psi(self, R, alpha):
         """Computes potential-field related energy contribution.
@@ -746,7 +741,7 @@ class LinearFreeFiled(FreeField):
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
-        alphar = self.alpha + self.dphi
+        alphar = self.alpha + self.phir
 
         S = self.S(alphar)
         R = self.R(alphar)
@@ -774,7 +769,7 @@ class QuadFreeField(FreeField):
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
-        alphar = self.alpha + self.dphi
+        alphar = self.alpha + self.phir
 
         Wr = coupled.w[RIM, ANY] + coupled.omega*self.r
         r = self.r
@@ -798,10 +793,36 @@ class QuadFreeField(FreeField):
         return lamW
 
 
-def imbalance(cell_field: CellField, free_field: FreeField):
+def imbalance(astcf: CellField, cf: CellField, ff: FreeField):
     # Function to compute mass imbalance of the overall solution step
-    pass
 
+    alphar = cf.alpha + cf.phir
+    astalphar = astcf.alpha + astcf.phir
+
+    dt = cf.t - astcf.t
+
+    dVLcdt = (cf.VL-astcf.VL)/dt
+    dVLfdt = (ff.V(alphar)-ff.V(astalphar))/dt
+    dVLdt = dVLcdt + dVLfdt
+
+    delta = cf.delta
+
+    alpharB = alphar - delta/2
+    alpharF = alphar + delta/2
+
+    L = ff.L
+    SB = ff.S(alpharB)
+    SF = ff.S(alpharF)
+
+    # Relative flow velocity
+    avwB = ff.avWB - cf.omega*ff.avR(alpharB)
+    avwF = ff.avWF - cf.omega*ff.avR(alpharB)
+
+    QB = avwB*L*SB
+    QF = avwF*L*SF
+    Qsum = QB - QF
+
+    return dVLdt - Qsum
 
 # Auxiliary functions
 
