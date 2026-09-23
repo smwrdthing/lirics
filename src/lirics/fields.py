@@ -526,7 +526,13 @@ class FreeField(ABC):
 
         return c
 
+    @abstractmethod
+    def updateWmodel(self, starred: FreeField, coupled: CellField):
+        return
+
     def solve(self, starred: FreeField, coupled: CellField):
+
+        self.updateWmodel(starred, coupled)
 
         alphar = self.alpha + self.dphi
         astalphar = starred.alpha + starred.dphi
@@ -611,14 +617,59 @@ class UniformFreeField(FreeField):
 
 class LinearFreeFiled(FreeField):
 
+    def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
+        super().__init__(cell, housing)
+        self.k = _SENTINTEL
+        self.b = _SENTINTEL
+
+    def updateWmodel(self, starred: FreeField, coupled: CellField):
+
+        S = self.S(self.alpha)
+        R = self.R(self.alpha)
+
+        self.k = -2/S
+        self.b = 2/S*R
+
     def lamW(self, R, alpha):
-        return k*R+b
+        return self.k*R+self.b
 
 
-class QuadraticFreeField(FreeField):
+class QuadFreeField(FreeField):
+
+    def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
+        super().__init__(cell, housing)
+
+        # lamW profile coefficents
+        self.a = _SENTINTEL
+        self.b = _SENTINTEL
+        self.c = _SENTINTEL
+
+        # Prescribed values for derivative constraint
+        self.Rp = _SENTINTEL
+        self.dWdRp = _SENTINTEL
+
+    def updateWmodel(self, starred: FreeField, coupled: CellField):
+
+        Wr = coupled.w[RIM, ANY] + coupled.omega*self.r
+        r = self.r
+        R = self.R(self.alpha)
+        S = self.S(self.alpha)
+
+        Rp = self.Rp
+        dWdRp = self.dWdRp
+
+        self.a = a = (Wr + self.dWdRp*S)/((R**2-r**2) - 2*Rp*S)
+        self.b = b = -2*a*Rp - dWdRp
+        self.c = -a*R**2 - b*R
 
     def lamW(self, R, alpha):
-        return a*R**2 + b*R + c
+
+        a, b, c = self.a, self.b, self.c
+        S = self.S(alpha)
+
+        lamW = (a*R**2 + b*R + c) / (a/3*S**2 + b/2*S + c)
+
+        return lamW
 
 
 def pathinterp(
