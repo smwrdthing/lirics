@@ -24,6 +24,8 @@ type ScipyInterpolator = Callable[[tuple[NDArray, NDArray]], NDArray]
 BACK_PHI_CORRECTION = np.deg2rad(0.5)
 NUM_INTEGRATION = 100
 
+_SENTINTEL = -1
+
 # Container access keys
 HUB = 0
 RIM = -1
@@ -342,14 +344,22 @@ class FreeField(ABC):
         self.dphi = cell.phi(cell.rrim)
         self.delta = cell.delta
 
-        self.alpha = 0
+        # NOTE : on field initialization
+        #        Probably it would be more convenient to set values of param containers to
+        #        some sentinel during object creation and adjust them afterwards with
+        #        special functionality. This goes both for free and cell fields, should
+        #        make "constructors" call signature lighter
 
-        self.rho = 0
-        self.Pr = 0
+        self.alpha = _SENTINTEL
 
-        self.avPsi = 0
-        self.avP = 0
-        self.avW = 0
+        self.rho = _SENTINTEL
+        self.Pr = _SENTINTEL
+
+        self.avPsi = _SENTINTEL
+        self.avP = _SENTINTEL
+        self.avW = _SENTINTEL
+
+        self.roots = np.full((1, 3), _SENTINTEL)  # Cubic equation -> 3 roots
 
     def S(self, alpha):
         """Computes out-of-impeller region thickness for given rotational angle."""
@@ -378,6 +388,14 @@ class FreeField(ABC):
 
         Other than that, the only mathematical restriction for this function, followng
         definition, is that it's average value must always yield 1."""
+
+        # NOTE : on lamW design
+        #        This should be designed to handle various models of lamW. (R,alpha)
+        #        dependency is very basic and should be included everywhere, specific
+        #        model can (and will), however, accept more parameters to for lamW.
+        #        Base class should anticipate and expect this behavior.
+        #
+        # Add **kwargs/**modelparams/**params? Rely on overrides?
 
         raise
 
@@ -409,6 +427,9 @@ class FreeField(ABC):
 
         return integral
 
+    def lamf(self, R, alpha):
+        return 1
+
     def kWPsi(self, alpha, n=NUM_INTEGRATION):
         """Compmutes average for convolution-like integral for velocity profile shape and
         specific potential-field related energy of the flow. Determines coefficent in the
@@ -428,6 +449,14 @@ class FreeField(ABC):
         x = np.linspace(self.r, self.R(alpha), n)
         integral = np.trapezoid(
             self.lamW(x, alpha)*self.lamCF(x, alpha), x, axis=0)
+
+        return integral/self.S(alpha)
+
+    def kWf(self, alpha, n=NUM_INTEGRATION):
+
+        x = np.linspace(self.r, self.R(alpha), n)
+        integral = np.trapezoid(
+            self.lamW(x, alpha) * self.lamf(x, alpha), x, axis=0)
 
         return integral/self.S(alpha)
 
@@ -454,11 +483,58 @@ class FreeField(ABC):
 
         return c
 
-    def solve(
-            self,
-            coupled: CellField,
-            starred: FreeField):
-        pass
+    def solve(self, starred: FreeField, coupled: CellField):
+
+        alpha = self.alpha + self.dphi
+        astalpha = starred.alpha + starred.dphi
+        dalpha = alpha - astalpha
+
+        gR0 = g*self.R(0)  # for Psi conputations
+
+        c = self.coeffs(alpha)
+
+        # Starred fixed field contribution
+        c[0] -= polyval(starred.avW, starred.coeffs(astalpha))
+
+        # Coupled rotating field contribution
+        Ur = coupled.u[RIM, ANY]
+        Wr = coupled.w[RIM, ANY] + coupled.omega*coupled.r[RIM, ANY]
+        Pr = coupled.pV + np.interp(self.dphi, coupled.phi[RIM], coupled.dprim)
+        Psir = gR0 - g*self.r*np.cos(alpha)
+        Jr = Psir + Pr/self.rho + (Ur**2 + Wr**2)/2
+        c[0] -= Ur*Jr*self.r*dalpha
+        # TODO : Extend CellField class to handle proper vapor parameters computations
+
+        # Friction contribution
+        astkWf = starred.kWf(astalpha)
+        astxi = starred.xi()  # TODO : this must be defined
+        astS = starred.S(astalpha)
+        c[0] -= astkWf*astxi/2*astS * starred.avW**3
+
+        self.roots = polyroots(c)  # roots of main equation
+
+        # Getting 3 roots from cubic equtaion leads to root selection, currently it is
+        # not known in what form roots are, we can get different values:
+        #   > imaginary
+        #   > real negative
+        #   > real positive
+        #
+        # Of course only real positive roots are meaningfull, but it is not impossible to
+        # get three real positive roots too
+        #
+        # Simplest selection just strips imaginary and negative numbers away, if all
+        # roots are positive - we may face more complex root selection algorithm problem
+
+        real_roots = np.real(self.roots[np.isreal(self.roots)])
+        positive_real_root = real_roots[real_roots > 0]
+
+        # Now it is possible to set section-average values
+        self.avW = positive_real_root
+        self.avP = Pr + self.rho*self.avW**2 * self.kWCF(alpha)
+        self.avPsi = gR0 - g*self.r*np.cos(alpha)
+
+        # Further course of action is to propagate parameters to boundaries of the
+        # considred domain. Then results nust be passed to mass imbalance check
 
     def propagate(self):
         pass
