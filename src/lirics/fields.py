@@ -601,7 +601,7 @@ class FreeField(ABC):
     def P(self, R, alpha):
         """Computes flow pressure.
         Uses average value and distribution function under the hood."""
-        return self.Pr + self.rho * self.avW**2 * self.lamW(R, alpha)
+        return self.Pr + self.rho * self.avW**2 * self.lamCF(R, alpha)
 
     def Re(self, alpha):
         return self.avW * self.hydD(alpha) * self.rho / self.mu
