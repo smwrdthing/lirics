@@ -614,7 +614,7 @@ class FreeField(ABC):
         # Coupled rotating field contribution
         Ur = coupled.u[RIM, ANY]
         Wr = coupled.w[RIM, ANY] + coupled.omega*coupled.r[RIM, ANY]
-        Pr = np.interp(self.phir, coupled.phi[RIM], coupled.prim)
+        self.Pr = Pr = np.interp(self.phir, coupled.phi[RIM], coupled.prim)
         Psir = gR0 - g*self.r*np.cos(alphar)
         Jr = Psir + Pr/self.rho + (Ur**2 + Wr**2)/2
         c[0] -= Ur*Jr*self.r*dalpha
@@ -797,7 +797,7 @@ def imbalance(astcf: CellField, cf: CellField, ff: FreeField):
 
     # Relative flow velocity
     avwB = ff.avWB - cf.omega*ff.avR(alpharB)
-    avwF = ff.avWF - cf.omega*ff.avR(alpharB)
+    avwF = ff.avWF - cf.omega*ff.avR(alpharF)
 
     QB = avwB*L*SB
     QF = avwF*L*SF
@@ -808,9 +808,7 @@ def imbalance(astcf: CellField, cf: CellField, ff: FreeField):
 # Auxiliary functions
 
 
-def pathinterp(
-        path: tuple[np.ndarray, np.ndarray],
-        intps: list[ScipyInterpolator]):
+def pathinterp(path: tuple[np.ndarray, np.ndarray], intps: list[ScipyInterpolator]):
     """Convenience field-on-path interpolator. Handles generic 2D field interpolation
     for interface reconstruction. Accepts desired path for interpolation,
     field-to-be interpolated and interpolator as inputs.

@@ -43,8 +43,8 @@ astcf = fields.CellField(cell, SHAPE)
 cf = fields.CellField(cell, SHAPE)
 
 # Cell fields initialization
-astVL = 0.12*cell.V
-Q = -2.27e-4  # adjusted manually to produce smallest imbalance, test more
+astVL = 0.15*cell.V
+Q = -0.2205e-3  # adjusted manually to run the code and produce lowest imbalance
 dVL = Q*DT
 VL = astVL + dVL
 astcf.t = cf.t = 0
@@ -53,6 +53,15 @@ astcf.omega = cf.omega = OMEGA
 astcf.rhoL = cf.rhoL = DENSITY
 astcf.VL = cf.VL = astVL
 astcf.u[:] = astcf.w[:] = 0
+
+astcf.pV = cf.pV = 1e5
+astcf.VV = cf.VV = astcf.V - astcf.VL
+astcf.TV = cf.TV = 293.15
+astcf.nV = cf.nV = 1.4
+astcf.RV = cf.RV = 8314/28
+astcf.GV = cf.GV = 0.0
+astcf.rhoV = cf.rhoV = astcf.pV/astcf.RV/astcf.TV
+astcf.mV = cf.mV = astcf.rhoV * astcf.VV
 
 # Cell fields solution
 cf.t += DT
@@ -71,11 +80,4 @@ astff.avW = 0.5 * OMEGA * cell.rrim
 astff.avP = 1e5 + astff.rho*astff.avW**2*astff.kWCF(astff.alpha+astff.phir)
 ff.solve(astff, cf)
 
-# Imbalance computations, added here preliminary, should be separate example
-# coupled_flow_solution.py?
-#
-# What is important now - procedure goes through without errors, we are finally in the
-# position to resolve coupled flow in the liquid ring machine with 2D model.
-#
-# For accurate results we still need good assumption about velocity field
 print(fields.imbalance(astcf, cf, ff))
