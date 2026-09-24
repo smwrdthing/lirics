@@ -10,6 +10,7 @@ from lirics import design, fields
 RPM = 1500
 OMEGA = np.pi*RPM/30
 DENSITY = 1000
+VISCOSITY = 1e-3
 
 DALPHA = np.deg2rad(1)
 DT = DALPHA/OMEGA
@@ -43,7 +44,7 @@ cf = fields.CellField(cell, SHAPE)
 
 # Cell fields initialization
 astVL = 0.12*cell.V
-Q = 1.5e-3
+Q = -2.27e-4  # adjusted manually to produce smallest imbalance, test more
 dVL = Q*DT
 VL = astVL + dVL
 astcf.t = cf.t = 0
@@ -62,3 +63,19 @@ cf.solve(astcf)
 # Free field construction
 astff = fields.UniformFreeField(cell, housing)
 ff = fields.UniformFreeField(cell, housing)
+
+# Free fields initialization
+astff.rho = ff.rho = DENSITY
+astff.mu = ff.mu = VISCOSITY
+astff.avW = 0.5 * OMEGA * cell.rrim
+astff.avP = 1e5 + astff.rho*astff.avW**2*astff.kWCF(astff.alpha+astff.phir)
+ff.solve(astff, cf)
+
+# Imbalance computations, added here preliminary, should be separate example
+# coupled_flow_solution.py?
+#
+# What is important now - procedure goes through without errors, we are finally in the
+# position to resolve coupled flow in the liquid ring machine with 2D model.
+#
+# For accurate results we still need good assumption about velocity field
+print(fields.imbalance(astcf, cf, ff))

@@ -360,15 +360,9 @@ class FreeField(ABC):
         self.avP = _SENTINEL
         self.avW = _SENTINEL
 
-        # Back field section-averaged necessary parameters
+        # Average velocities at boundaries
         self.avWB = _SENTINEL
-        self.QB = _SENTINEL
-        self.GB = _SENTINEL
-
-        # Front field section-averaged necessary parameters
         self.avWF = _SENTINEL
-        self.QF = _SENTINEL
-        self.GF = _SENTINEL
 
         self.roots = np.full((1, 3), _SENTINEL)  # Cubic equation -> 3 roots
 
@@ -672,9 +666,9 @@ class FreeField(ABC):
         Wb = []
         for alpha, key in zip(alphab, (BACK, FRONT)):
 
-            kWCFb = self.kWCF(alphab)
+            kWCFb = self.kWCF(alpha)
             avPsib = gR0 - g*self.avR(alpha)*np.cos(alpha)
-            Prb = coupled.prim[RIM, key]
+            Prb = coupled.prim[key]
 
             dPsi = self.avPsi - avPsib
             dPr = self.Pr - Prb
