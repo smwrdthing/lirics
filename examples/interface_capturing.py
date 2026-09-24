@@ -17,7 +17,7 @@ NUM_OF_CELLS = 12
 N_R_SEGMENTS = 31
 N_PHI_SEGMENTS = 31
 
-# cell object construction
+# Cell construction
 cell = design.ArchImpellerCell(
     rhub := 100e-3,
     rrim := 200e-3,
@@ -28,27 +28,34 @@ cell = design.ArchImpellerCell(
 )
 
 # Fields construction
-VLstar = 3e-4
+starred = fields.CellField(cell, (N_R_SEGMENTS, N_PHI_SEGMENTS))
+current = fields.CellField(cell, (N_R_SEGMENTS, N_PHI_SEGMENTS))
+
+# Fields initialization
+astVL = 3e-4
 Q = 5e-3
 dVL = Q*DT
-VL = VLstar+dVL
-old_cell_field = fields.CellField(
-    cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VLstar, DENSITY, OMEGA
-)
-cell_field = fields.CellField(
-    cell, (N_R_SEGMENTS, N_PHI_SEGMENTS), VL, DENSITY, OMEGA)
+VL = astVL + dVL
+starred.t = current.t = 0
+starred.alpha = current.alpha = 0
+starred.omega = current.omega = OMEGA
+starred.rhoL = current.rhoL = DENSITY
+starred.VL = current.VL = astVL
+starred.u[:] = starred.w[:] = 0
 
 # Fields computation
-cell_field.t += DT
-cell_field.U(old_cell_field)
-cell_field.dUdt(old_cell_field)
-cell_field.dUdr()
-cell_field.gradP()
+current.t += DT
+current.alpha += DALPHA
+current.VL += dVL
+current.U(starred)
+current.dUdt(starred)
+current.dUdr()
+current.gradP()
 
 rref = 0.6*(cell.rhub+cell.rrim)
-cell_field.capture_inteface(rref)
-loop = cell_field.evalvof()
-actualVL = cell_field.actVL
+current.capture_inteface(rref)
+loop = current.evalvof()
+actVL = current.actVL
 
 # Plotting interface capturing results
 fig, ax = plt.subplots()
@@ -63,10 +70,10 @@ xhub, yhub = transform.rphi_to_xy(
 xrim, yrim = transform.rphi_to_xy(
     cell.rrim*np.ones(100), np.linspace(0, 2*np.pi, 100))
 # Grid
-x_grid, y_grid = transform.rphi_to_xy(cell_field.r, cell_field.phi)
+x_grid, y_grid = transform.rphi_to_xy(current.r, current.phi)
 
 # Interface
-xif, yif = transform.rphi_to_xy(cell_field.rif, cell_field.phiif)
+xif, yif = transform.rphi_to_xy(current.rif, current.phiif)
 
 xlims = (np.min(x_grid)*1e3-20, np.max(x_grid)*1e3+20)
 ylims = (np.min(y_grid)*1e3-20, np.max(y_grid)*1e3+20)
@@ -95,9 +102,8 @@ s = 8
 ax.text(xtxt, ytxt[0], r"$\Delta t=$"+f"{DT*1e3:.2f} ms", {"size": s})
 ax.text(xtxt, ytxt[1], r"$Q^{(L)}=$"+f"{Q*1e3*60:.2f} L/min", {"size": s})
 ax.text(xtxt, ytxt[2], r"$V^{(L)}=$"+f"{VL*1e3:.2e} L", {"size": s})
-ax.text(xtxt, ytxt[3], r"$V^{*(L)}=$"+f"{VLstar*1e3:.2e} L", {"size": s})
+ax.text(xtxt, ytxt[3], r"$V^{*(L)}=$"+f"{astVL*1e3:.2e} L", {"size": s})
 ax.text(xtxt, ytxt[4], r"$\Delta V^{(L)}=$"+f"{dVL*1e3:.2e} L", {"size": s})
-ax.text(
-    xtxt, ytxt[5], r"$V^{(L)}_{act.}=$"+f"{actualVL*1e3:.2e} L", {"size": s})
+ax.text(xtxt, ytxt[5], r"$V^{(L)}_{act.}=$"+f"{actVL*1e3:.2e} L", {"size": s})
 
 plt.show()

@@ -29,15 +29,26 @@ cell = design.ArchImpellerCell(
 )
 
 # Fields construction
-VLstar = 0.12*cell.V
-old_cell_field = fields.CellField(cell, SHAPE, VLstar, DENSITY, OMEGA)
-cell_field = fields.CellField(cell, SHAPE, VLstar, DENSITY, OMEGA)
+starred = fields.CellField(cell, SHAPE)
+current = fields.CellField(cell, SHAPE)
 
-# Fields computation
+# Fields initialization
+astVL = 0.12*cell.V
 Q = 1.5e-3
-cell_field.t += DT
-cell_field.VL += Q*DT
-cell_field.solve(old_cell_field)
+dVL = Q*DT
+VL = astVL + dVL
+starred.t = current.t = 0
+starred.alpha = current.alpha = 0
+starred.omega = current.omega = OMEGA
+starred.rhoL = current.rhoL = DENSITY
+starred.VL = current.VL = astVL
+starred.u[:] = starred.w[:] = 0
+
+# Fields solution
+current.t += DT
+current.alpha += DALPHA
+current.VL += Q*DT
+current.solve(starred)
 
 # Plotting interface capturing results
 fig, ax = plt.subplots()
@@ -52,10 +63,10 @@ xhub, yhub = transform.rphi_to_xy(
 xrim, yrim = transform.rphi_to_xy(
     cell.rrim*np.ones(100), np.linspace(0, 2*np.pi, 100))
 # Grid
-x_grid, y_grid = transform.rphi_to_xy(cell_field.r, cell_field.phi)
+x_grid, y_grid = transform.rphi_to_xy(current.r, current.phi)
 
 # Interface
-xif, yif = transform.rphi_to_xy(cell_field.rif, cell_field.phiif)
+xif, yif = transform.rphi_to_xy(current.rif, current.phiif)
 
 xlims = (np.min(x_grid)*1e3-20, np.max(x_grid)*1e3+20)
 ylims = (np.min(y_grid)*1e3-20, np.max(y_grid)*1e3+20)

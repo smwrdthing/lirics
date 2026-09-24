@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lirics import design, fields, grid, transform
+from lirics import design, fields
 
 # For free flow solution we need to construct proper cell-flow solution for
 # coupling
@@ -20,7 +20,7 @@ N_R_SEGMENTS = 31
 N_PHI_SEGMENTS = 31
 SHAPE = (N_R_SEGMENTS, N_PHI_SEGMENTS)
 
-# cell object construction
+# Cell construction
 cell = design.ArchImpellerCell(
     rhub := 100e-3,
     rrim := 200e-3,
@@ -30,25 +30,35 @@ cell = design.ArchImpellerCell(
     s=5e-3
 )
 
+# Housing construction
 housing = design.CylindricalHousing(
     cell.l,
     0.15*cell.rrim,
     design.infer_housing_radius(cell.rrim, 0.15*cell.rrim, 5e-3))
 
 
-# Fields construction
-VLstar = 0.2*cell.V
-astcf = fields.CellField(cell, SHAPE, VLstar, DENSITY, OMEGA)
-cf = fields.CellField(cell, SHAPE, VLstar, DENSITY, OMEGA)
+# Cell fields construction
+astcf = fields.CellField(cell, SHAPE)
+cf = fields.CellField(cell, SHAPE)
 
-# Fields computation
+# Cell fields initialization
+astVL = 0.12*cell.V
 Q = 1.5e-3
+dVL = Q*DT
+VL = astVL + dVL
+astcf.t = cf.t = 0
+astcf.alpha = cf.alpha = 0
+astcf.omega = cf.omega = OMEGA
+astcf.rhoL = cf.rhoL = DENSITY
+astcf.VL = cf.VL = astVL
+astcf.u[:] = astcf.w[:] = 0
+
+# Cell fields solution
 cf.t += DT
 cf.alpha += DALPHA
 cf.VL += Q*DT
 cf.solve(astcf)
 
-# Free field definitions
+# Free field construction
 astff = fields.UniformFreeField(cell, housing)
 ff = fields.UniformFreeField(cell, housing)
-ff.alpha += DALPHA

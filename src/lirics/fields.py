@@ -23,7 +23,7 @@ type ScipyInterpolator = Callable[[tuple[NDArray, NDArray]], NDArray]
 BACK_PHI_CORRECTION = np.deg2rad(0.5)
 NUM_INTEGRATION = 100
 
-_SENTINTEL = -1.0
+_SENTINEL = -1.0
 
 # Container access keys
 HUB = 0
@@ -60,14 +60,7 @@ class CellField:
 
     """
 
-    def __init__(
-            self,
-            cell: ImpellerCell,
-            shape: tuple[int, int],
-            VL: float,
-            rho: float,
-            omega: float
-    ) -> None:
+    def __init__(self, cell: ImpellerCell, shape: tuple[int, int]) -> None:
 
         self._cell = cell
 
@@ -75,49 +68,45 @@ class CellField:
         self.phir = cell.phi(cell.rrim)
         self.delta = cell.delta
 
-        # Vapor parameters?
-        self.pV = np.nan
-        self.VV = np.nan
-        self.TV = np.nan
-        self.rhoV = np.nan
-        self.nV = np.nan
-        self.mV = np.nan
-        self.GV = np.nan
-        self.RV = np.nan
-
-        self.VL = VL
-        self.actVL = np.nan
-
-        # Considered flow is incompressible, so density "field" is constant
-        self.rhoL = rho
-
-        # Field exists in time and space
-        self.omega = omega
-        self.alpha = 0
-        self.t = 0
         self.r, self.phi = grid.generate(cell, shape)
-
         self.Af = cell.Af(self.r)
         self.dphidr = calculus.dydx(self.phi, self.r)
 
-        self.u = np.zeros_like(self.r)
-        self.w = np.zeros_like(self.r)
+        self.t = _SENTINEL
+        self.alpha = _SENTINEL
+        self.omega = _SENTINEL
 
-        self.dudr = np.zeros_like(self.r)
-        self.dwdr = np.zeros_like(self.r)
+        self.rhoL = _SENTINEL
+        self.VL = _SENTINEL
+        self.actVL = _SENTINEL
 
-        self.dudt = np.zeros_like(self.r)
-        self.dwdt = np.zeros_like(self.r)
+        self.pV = _SENTINEL
+        self.VV = _SENTINEL
+        self.TV = _SENTINEL
+        self.rhoV = _SENTINEL
+        self.nV = _SENTINEL
+        self.mV = _SENTINEL
+        self.GV = _SENTINEL
+        self.RV = _SENTINEL
 
-        self.dpdr = np.zeros_like(self.r)
-        self.dpdphi = np.zeros_like(self.r)
+        self.u = np.full_like(self.r, _SENTINEL)
+        self.w = np.full_like(self.r, _SENTINEL)
 
-        self.dprim = np.zeros_like(self.phi[RIM])
-        self.prim = np.zeros_like(self.phi[RIM])
+        self.dudr = np.full_like(self.r, _SENTINEL)
+        self.dwdr = np.full_like(self.r, _SENTINEL)
+
+        self.dudt = np.full_like(self.r, _SENTINEL)
+        self.dwdt = np.full_like(self.r, _SENTINEL)
+
+        self.dpdr = np.full_like(self.r, _SENTINEL)
+        self.dpdphi = np.full_like(self.r, _SENTINEL)
+
+        self.dprim = np.full_like(self.phi[RIM], _SENTINEL)
+        self.prim = np.full_like(self.phi[RIM], _SENTINEL)
 
         # Attributes to hold interface points
-        self.rif = np.zeros_like(self.phi[RIM])
-        self.phiif = np.zeros_like(self.phi[RIM])
+        self.rif = np.full_like(self.phi[RIM], _SENTINEL)
+        self.phiif = np.full_like(self.phi[RIM], _SENTINEL)
 
         # phi correction (necessary for surface capturing)
         self.phicorr = np.zeros_like(self.phi[RIM])
@@ -360,28 +349,28 @@ class FreeField(ABC):
         #        special functionality. This goes both for free and cell fields, should
         #        make "constructors" call signature lighter
 
-        self.alpha = _SENTINTEL
+        self.alpha = _SENTINEL
 
-        self.rho = _SENTINTEL
-        self.mu = _SENTINTEL
+        self.rho = _SENTINEL
+        self.mu = _SENTINEL
 
-        self.Pr = _SENTINTEL
+        self.Pr = _SENTINEL
 
-        self.avPsi = _SENTINTEL
-        self.avP = _SENTINTEL
-        self.avW = _SENTINTEL
+        self.avPsi = _SENTINEL
+        self.avP = _SENTINEL
+        self.avW = _SENTINEL
 
         # Back field section-averaged necessary parameters
-        self.avWB = _SENTINTEL
-        self.QB = _SENTINTEL
-        self.GB = _SENTINTEL
+        self.avWB = _SENTINEL
+        self.QB = _SENTINEL
+        self.GB = _SENTINEL
 
         # Front field section-averaged necessary parameters
-        self.avWF = _SENTINTEL
-        self.QF = _SENTINTEL
-        self.GF = _SENTINTEL
+        self.avWF = _SENTINEL
+        self.QF = _SENTINEL
+        self.GF = _SENTINEL
 
-        self.roots = np.full((1, 3), _SENTINTEL)  # Cubic equation -> 3 roots
+        self.roots = np.full((1, 3), _SENTINEL)  # Cubic equation -> 3 roots
 
     def S(self, alpha):
         """Computes out-of-impeller region thickness for given rotational angle."""
@@ -734,8 +723,8 @@ class LinearFreeFiled(FreeField):
 
     def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
         super().__init__(cell, housing)
-        self.k = _SENTINTEL
-        self.b = _SENTINTEL
+        self.k = _SENTINEL
+        self.b = _SENTINEL
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
@@ -757,13 +746,13 @@ class QuadFreeField(FreeField):
         super().__init__(cell, housing)
 
         # lamW profile coefficents
-        self.a = _SENTINTEL
-        self.b = _SENTINTEL
-        self.c = _SENTINTEL
+        self.a = _SENTINEL
+        self.b = _SENTINEL
+        self.c = _SENTINEL
 
         # Prescribed values for derivative constraint
-        self.Rp = _SENTINTEL
-        self.dWdRp = _SENTINTEL
+        self.Rp = _SENTINEL
+        self.dWdRp = _SENTINEL
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
