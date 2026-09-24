@@ -288,21 +288,19 @@ class CellField:
 
         return self.VL-self.actVL
 
-    def solve(
-            self,
-            starred: CellField,
-    ):
+    def solve(self, starred: CellField):
         """Implements solution algorithm for the flow field in the cell of the
-        liquid ring machine. Sets new (guessed) value of liquid volume in the cell
-        VLnew  and new value for time t. Uses prior-state field for temporal derivative.
+        liquid ring machine. Uses new (guessed) value of liquid volume in the cell
+        and prior-state field for calculations.
 
         Flow field is resolved by means of solving two rootfinding problems:
 
         > First problem corresponds to interface capturing for given reference point
           on the midline of the cell. This problem actually comprises of multiple
           rootfinding problems, each searching for location where pressure difference
-          turns zero.
-            For further details on this part of algorithm refer to capture_interface
+          turns zero for corresponding angular shift relative to the midline.
+                                    | For further details on this part of algorithm
+                                    | refer to capture_interface
 
         > Second problem correspond to the search of correct rref value which will,
           in fact, ensure that computed interface corresponds to given VLnew value.
