@@ -622,7 +622,7 @@ class FreeField(ABC):
 
         # Friction contribution
         astkWf = starred.kWf(astalphar)
-        astxi = starred.xi(self.alpha, dalpha)
+        astxi = starred.xi(astalphar, dalpha)
         astS = starred.S(astalphar)
         c[0] -= astkWf*astxi/2*astS * starred.avW**3
 
