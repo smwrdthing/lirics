@@ -653,8 +653,8 @@ class FreeField(ABC):
         self.propagate(coupled)
 
     def propagate(self, coupled: CellField):
-
-        # NOTE : some quick dirty code here, should rewrite
+        """Propagates midline parameters to the domain boundaries assuming Bernoulli's
+        principle is satisfied locally."""
 
         alphar = self.alpha+self.phir
         alphab = (alphar-self.delta/2,
@@ -664,11 +664,11 @@ class FreeField(ABC):
         kWCF = self.kWCF(alphar)
 
         Wb = []
-        for alpha, key in zip(alphab, (BACK, FRONT)):
+        for loc in (BACK, FRONT):
 
-            kWCFb = self.kWCF(alpha)
-            avPsib = gR0 - g*self.avR(alpha)*np.cos(alpha)
-            Prb = coupled.prim[key]
+            kWCFb = self.kWCF(alphab[loc])
+            avPsib = gR0 - g*self.avR(alphab[loc])*np.cos(alphab[loc])
+            Prb = coupled.prim[loc]
 
             dPsi = self.avPsi - avPsib
             dPr = self.Pr - Prb
@@ -680,7 +680,6 @@ class FreeField(ABC):
                 )
             )
 
-        # Unpacking values to attributes
         self.avWB, self.avWF = Wb
 
     def Psi(self, R, alpha):
