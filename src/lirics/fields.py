@@ -591,9 +591,9 @@ class FreeField(ABC):
 
         S = self.S(alpha)
         c = np.array([
-            0,  # W^0 / should be based on prior field values
+            0.0,  # W^0 / should be based on prior field values
             (self.kWPsi(alpha)*self.avPsi + self.Pr/self.rhoL)*S,  # W^1
-            0,  # W^2
+            0.0,  # W^2
             (self.kWCF(alpha) + self.kWWW(alpha)/2)*S  # W^3
         ])
 
@@ -655,14 +655,24 @@ class FreeField(ABC):
         astxi = starred.xi(starred_alphar, dalpha)
         astS = starred.S(starred_alphar)
 
+        print(f"c*={starred.coeffs(starred_alphar)}")
+
         c = self.coeffs(self.alphar)
+        print(f"{c=}")
+
         # external contributions
         c[0] -= polyval(starred.avW, starred.coeffs(starred_alphar))  # starred
+        print(f"{c=}")
+
         c[0] -= Ur*Jr*self.r*dalpha  # coupled
+        print(f"{c=}")
+
         c[0] += astkWf*astxi/2 * starred.avW**3 * astS  # friction
+        print(f"{c=}")
+
+        print()
 
         self.roots = polyroots(c)
-
         # Getting 3 roots from cubic equtaion leads to root selection, currently it is
         # not known in what form roots are, we can get different values:
         #   > imaginary

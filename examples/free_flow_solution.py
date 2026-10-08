@@ -42,7 +42,7 @@ housing = design.CylindricalHousing(
 
 # Cell fields initialization
 astVL = 0.15*cell.V
-Q = -1e-3
+Q = 2e-3
 dVL = Q*DT
 VL = astVL + dVL
 
@@ -86,7 +86,7 @@ starred_cf.GV = cf.GV = 0.0
 cf.solve(starred_cf)
 
 # Free field construction
-starred_ff = fields.LinearFreeFiled(
+starred_ff = fields.UniformFreeField(
     {
         "cell": cell,
         "housing": housing,
@@ -94,11 +94,11 @@ starred_ff = fields.LinearFreeFiled(
         "rhoL": LIQ_DENSITY,
         "muL": LIQ_VISCOSITY,
 
-        "avW": 0.5 * OMEGA * cell.rrim,
+        "avW": OMEGA * cell.rrim,
         "Pr": 1e5,
     }
 )
-ff = fields.LinearFreeFiled(
+ff = fields.UniformFreeField(
     {
         "cell": cell,
         "housing": housing,
