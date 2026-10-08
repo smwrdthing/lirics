@@ -109,3 +109,4 @@ ff = fields.UniformFreeField(
 )
 ff.solve(starred_ff, cf)
 dV = fields.imbalance(starred_cf, cf, ff)
+print(dV)

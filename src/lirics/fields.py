@@ -834,8 +834,6 @@ def imbalance(starred_cf: CellField, cf: CellField, ff: FreeField):
     QF = avwF*L*SF
     Qsum = QB - QF
 
-    print(f"res = {dVLTdt-Qsum}")
-
     return dVLTdt - Qsum
 
 
