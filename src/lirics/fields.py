@@ -396,17 +396,11 @@ class FreeField(ABC):
         self.rhoL = initializer["rhoL"]
         self.muL = initializer["muL"]
 
-        # Average velocities at boundaries
-        self.avWB = _SENTINEL
-        self.avWF = _SENTINEL
-
         self._gR0 = g*self.R(0)
         self.avPsi = self._gR0 - g*self.avR(self.alphar)*np.cos(self.alphar)
         if "avW" in initializer and "Pr" in initializer:
             self.avW = initializer["avW"]
             self.Pr = initializer["Pr"]
-            self.avP = self.Pr + self.rhoL * \
-                self.avW**2 * self.kWCF(self.alphar)
 
         self.roots = np.full((1, 3), _SENTINEL)  # Cubic equation -> 3 roots
 
@@ -684,6 +678,9 @@ class FreeField(ABC):
         real_roots = np.real(self.roots[np.isreal(self.roots)])
         positive_real_root = real_roots[real_roots > 0]
 
+        if positive_real_root.size == 0:
+            raise ValueError("No physically valid roots were found.")
+
         # Now it is possible to set section-average values
         self.avW = positive_real_root
         self.avP = Pr + self.rhoL*self.avW**2 * self.kWCF(self.alphar)
@@ -697,8 +694,8 @@ class FreeField(ABC):
         """Propagates midline parameters to the domain boundaries assuming Bernoulli's
         principle is satisfied locally."""
 
-        alphab = (self.alphar-self.delta/2,
-                  self.alphar+self.delta/2)
+        alphab = (self.alphar - self.delta/2,
+                  self.alphar + self.delta/2)
 
         kWCF = self.kWCF(self.alphar)
 
@@ -714,8 +711,7 @@ class FreeField(ABC):
 
             Wb.append(
                 np.sqrt(
-                    1/(kWCFb+1/2) * (dPsi + dPr/self.rhoL +
-                                     (kWCF + 1/2)*self.avW**2)
+                    (dPsi + dPr/self.rhoL + (kWCF+1/2)*self.avW**2) / (kWCFb+1/2)
                 )
             )
 
@@ -754,6 +750,9 @@ class UniformFreeField(FreeField):
 class LinearFreeFiled(FreeField):
 
     def __init__(self, initializer: FreeFieldInitializer) -> None:
+
+        # TODO : fix FreeField init issues
+
         super().__init__(initializer)
         self.k = _SENTINEL
         self.b = _SENTINEL
@@ -836,6 +835,38 @@ def imbalance(starred_cf: CellField, cf: CellField, ff: FreeField):
     QB = avwB*L*SB
     QF = avwF*L*SF
     Qsum = QB - QF
+
+    print(f"{dt=: .7f} s")
+    print(f"omega= {cf.omega}")
+    print()
+    print(f"{SB*1e3=: .7f} mm")
+    print(f"{SF*1e3=: .7f} mm")
+    print()
+    print(f"avRB={ff.avR(alpharB)*1e3: .7f} mm")
+    print(f"avRF={ff.avR(alpharF)*1e3: .7f} mm")
+    print()
+    print(f"{ff.V(alphar)*1e3=: .7f}")
+    print(f"{ff.V(alphar-dalpha)*1e3=: .7f}")
+    print()
+    print(f"{dVLCdt=: .7f}")
+    print(f"{dVLFdt=: .7f}")
+    print(f"{dVLTdt=: .7f}")
+    print()
+    print(f"{ff.avW=}")
+    print(f"{ff.avWB=}")
+    print(f"{ff.avWF=}")
+    print()
+    print(f"sweepWB={cf.omega*ff.avR(alpharB)}")
+    print(f"sweepWF={cf.omega*ff.avR(alpharF)}")
+    print()
+    print(f"{avwB=}")
+    print(f"{avwF=}")
+    print()
+    print(f"{QB=}")
+    print(f"{-QF=}")
+    print(f"{Qsum=}")
+    print()
+    print(f"dV = {dVLTdt-Qsum}")
 
     return dVLTdt - Qsum
 
