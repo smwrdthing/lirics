@@ -14,7 +14,7 @@ LIQ_VISCOSITY = 1e-3
 VAP_MOLMASS = 28.97e-3
 VAP_HCRATIO = 1.4
 
-DALPHA = np.deg2rad(1)
+DALPHA = np.deg2rad(5)
 DT = DALPHA/OMEGA
 
 NUM_OF_CELLS = 12
@@ -41,8 +41,8 @@ housing = design.CylindricalHousing(
 
 
 # Cell fields initialization
-astVL = 0.15*cell.V
-Q = 2e-3
+astVL = 0.2*cell.V
+Q = 1.88e-2
 dVL = Q*DT
 VL = astVL + dVL
 
@@ -109,5 +109,3 @@ ff = fields.UniformFreeField(
 )
 ff.solve(starred_ff, cf)
 dV = fields.imbalance(starred_cf, cf, ff)
-
-# TODO : debugging + analysis

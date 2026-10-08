@@ -469,10 +469,8 @@ class FreeField(ABC):
         Curent implementation implies specific orientation of the machine in space,
         more gemeral approach would be introducing i.e. housing tilt"""
 
-        gR0 = g*self.R(0)
-
-        Psi = gR0 - g*R*np.cos(alpha)
-        avPsi = gR0 - g*self.avR(alpha)*np.cos(alpha)
+        Psi = self._gR0 - g*R*np.cos(alpha)
+        avPsi = self._gR0 - g*self.avR(alpha)*np.cos(alpha)
 
         return Psi/avPsi
 
@@ -655,22 +653,12 @@ class FreeField(ABC):
         astxi = starred.xi(starred_alphar, dalpha)
         astS = starred.S(starred_alphar)
 
-        print(f"c*={starred.coeffs(starred_alphar)}")
-
         c = self.coeffs(self.alphar)
-        print(f"{c=}")
 
         # external contributions
         c[0] -= polyval(starred.avW, starred.coeffs(starred_alphar))  # starred
-        print(f"{c=}")
-
         c[0] -= Ur*Jr*self.r*dalpha  # coupled
-        print(f"{c=}")
-
         c[0] += astkWf*astxi/2 * starred.avW**3 * astS  # friction
-        print(f"{c=}")
-
-        print()
 
         self.roots = polyroots(c)
         # Getting 3 roots from cubic equtaion leads to root selection, currently it is
@@ -846,37 +834,7 @@ def imbalance(starred_cf: CellField, cf: CellField, ff: FreeField):
     QF = avwF*L*SF
     Qsum = QB - QF
 
-    print(f"{dt=: .7f} s")
-    print(f"omega= {cf.omega}")
-    print()
-    print(f"{SB*1e3=: .7f} mm")
-    print(f"{SF*1e3=: .7f} mm")
-    print()
-    print(f"avRB={ff.avR(alpharB)*1e3: .7f} mm")
-    print(f"avRF={ff.avR(alpharF)*1e3: .7f} mm")
-    print()
-    print(f"{ff.V(alphar)*1e3=: .7f}")
-    print(f"{ff.V(alphar-dalpha)*1e3=: .7f}")
-    print()
-    print(f"{dVLCdt=: .7f}")
-    print(f"{dVLFdt=: .7f}")
-    print(f"{dVLTdt=: .7f}")
-    print()
-    print(f"{ff.avW=}")
-    print(f"{ff.avWB=}")
-    print(f"{ff.avWF=}")
-    print()
-    print(f"sweepWB={cf.omega*ff.avR(alpharB)}")
-    print(f"sweepWF={cf.omega*ff.avR(alpharF)}")
-    print()
-    print(f"{avwB=}")
-    print(f"{avwF=}")
-    print()
-    print(f"{QB=}")
-    print(f"{-QF=}")
-    print(f"{Qsum=}")
-    print()
-    print(f"dV = {dVLTdt-Qsum}")
+    print(f"res = {dVLTdt-Qsum}")
 
     return dVLTdt - Qsum
 
