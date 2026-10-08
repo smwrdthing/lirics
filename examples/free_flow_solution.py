@@ -9,8 +9,10 @@ from lirics import design, fields
 # Setup
 RPM = 1500
 OMEGA = np.pi*RPM/30
-DENSITY = 1000
-VISCOSITY = 1e-3
+LIQ_DENSITY = 1000
+LIQ_VISCOSITY = 1e-3
+VAP_MOLMASS = 28.97e-3
+VAP_HCRATIO = 1.4
 
 DALPHA = np.deg2rad(1)
 DT = DALPHA/OMEGA
@@ -33,51 +35,77 @@ cell = design.ArchImpellerCell(
 
 # Housing construction
 housing = design.CylindricalHousing(
-    cell.l,
-    0.15*cell.rrim,
-    design.infer_housing_radius(cell.rrim, 0.15*cell.rrim, 5e-3))
+    L=cell.l, epsilon=0.0,
+    e=0.15*cell.rrim,
+    Rc=design.infer_housing_radius(cell.rrim, 0.15*cell.rrim, 5e-3))
 
-
-# Cell fields construction
-astcf = fields.CellField(cell, SHAPE)
-cf = fields.CellField(cell, SHAPE)
 
 # Cell fields initialization
 astVL = 0.15*cell.V
-Q = -0.2205e-3  # adjusted manually to run the code and produce lowest imbalance
+Q = 0.3e-3
 dVL = Q*DT
 VL = astVL + dVL
-astcf.t = cf.t = 0
-astcf.alpha = cf.alpha = 0
-astcf.omega = cf.omega = OMEGA
-astcf.rhoL = cf.rhoL = DENSITY
-astcf.VL = cf.VL = astVL
-astcf.u[:] = astcf.w[:] = 0
 
-astcf.pV = cf.pV = 1e5
-astcf.VV = cf.VV = astcf.V - astcf.VL
-astcf.TV = cf.TV = 293.15
-astcf.nV = cf.nV = 1.4
-astcf.RV = cf.RV = 8314/28
-astcf.GV = cf.GV = 0.0
-astcf.rhoV = cf.rhoV = astcf.pV/astcf.RV/astcf.TV
-astcf.mV = cf.mV = astcf.rhoV * astcf.VV
+starred_cf = fields.CellField(
+    {
+        "cell": cell,
+        "shape": SHAPE,
+
+        "t": 0.0,
+        "alpha": 0.0,
+        "omega": OMEGA,
+
+        "u": 0.0,
+
+        "VL": astVL,
+        "rhoL": LIQ_DENSITY,
+        "pV": 101325,
+        "TV": 20 + 273.15,
+        "MV": VAP_MOLMASS,
+        "nV": VAP_HCRATIO,
+    }
+)
+cf = fields.CellField(
+    {
+        "cell": cell,
+        "shape": SHAPE,
+
+        "t": starred_cf.t + DT,
+        "alpha": starred_cf.alpha + DALPHA,
+        "omega": OMEGA,
+
+        "VL": VL,
+        "rhoL": LIQ_DENSITY,
+        "MV": VAP_MOLMASS,
+        "nV": VAP_HCRATIO,
+    }
+)
+starred_cf.GV = cf.GV = 0.0
 
 # Cell fields solution
-cf.t += DT
-cf.alpha += DALPHA
-cf.VL += Q*DT
-cf.solve(astcf)
+cf.solve(starred_cf)
 
 # Free field construction
-astff = fields.UniformFreeField(cell, housing)
-ff = fields.UniformFreeField(cell, housing)
+starred_ff = fields.UniformFreeField(
+    {
+        "cell": cell,
+        "housing": housing,
+        "alpha": starred_cf.alpha,
+        "rhoL": LIQ_DENSITY,
+        "muL": LIQ_VISCOSITY,
 
-# Free fields initialization
-astff.rho = ff.rho = DENSITY
-astff.mu = ff.mu = VISCOSITY
-astff.avW = 0.5 * OMEGA * cell.rrim
-astff.avP = 1e5 + astff.rho*astff.avW**2*astff.kWCF(astff.alpha+astff.phir)
-ff.solve(astff, cf)
-
-print(fields.imbalance(astcf, cf, ff))
+        "avW": 0.5 * OMEGA * cell.rrim,
+        "Pr": 1e5
+    }
+)
+ff = fields.UniformFreeField(
+    {
+        "cell": cell,
+        "housing": housing,
+        "alpha": starred_cf.alpha,
+        "rhoL": LIQ_DENSITY,
+        "muL": LIQ_VISCOSITY,
+    }
+)
+ff.solve(starred_ff, cf)
+dm = fields.imbalance(starred_cf, cf, ff)

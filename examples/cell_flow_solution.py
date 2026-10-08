@@ -7,7 +7,9 @@ from lirics import design, fields, grid, transform
 # Setup
 RPM = 1500
 OMEGA = np.pi*RPM/30
-DENSITY = 1000
+LIQ_DENSITY = 1000
+VAP_MOLMASS = 28.97e-3
+VAP_HCRATIO = 1.4
 
 DALPHA = np.deg2rad(1)
 DT = DALPHA/OMEGA
@@ -28,26 +30,46 @@ cell = design.ArchImpellerCell(
     s=5e-3
 )
 
-# Fields construction
-starred = fields.CellField(cell, SHAPE)
-current = fields.CellField(cell, SHAPE)
-
 # Fields initialization
 astVL = 0.12*cell.V
 Q = 1.5e-3
 dVL = Q*DT
 VL = astVL + dVL
-starred.t = current.t = 0
-starred.alpha = current.alpha = 0
-starred.omega = current.omega = OMEGA
-starred.rhoL = current.rhoL = DENSITY
-starred.VL = current.VL = astVL
-starred.u[:] = starred.w[:] = 0
 
-# Fields solution
-current.t += DT
-current.alpha += DALPHA
-current.VL += Q*DT
+starred = fields.CellField(
+    {
+        "cell": cell,
+        "shape": SHAPE,
+
+        "t": 0.0,
+        "alpha": 0.0,
+        "omega": OMEGA,
+
+        "u": 0.0,
+
+        "VL": astVL,
+        "rhoL": LIQ_DENSITY,
+        "pV": 101325,
+        "TV": 20 + 273.15,
+        "MV": VAP_MOLMASS,
+        "nV": VAP_HCRATIO,
+    }
+)
+current = fields.CellField(
+    {
+        "cell": cell,
+        "shape": SHAPE,
+
+        "t": starred.t + DT,
+        "alpha": starred.alpha + DALPHA,
+        "omega": OMEGA,
+
+        "VL": VL,
+        "rhoL": LIQ_DENSITY,
+        "MV": VAP_MOLMASS,
+        "nV": VAP_HCRATIO,
+    }
+)
 current.solve(starred)
 
 # Plotting interface capturing results

@@ -1,11 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, TypedDict, NotRequired
 from numpy.typing import NDArray
 
 import numpy as np
 from numpy.polynomial.polynomial import polyroots, polyval
-from scipy.constants import g
+from scipy.constants import g, R
 from scipy.interpolate import LinearNDInterpolator as linearNDintp
 from scipy.optimize import newton
 
@@ -13,11 +13,47 @@ from lirics import calculus
 from lirics import grid
 from lirics.design import ImpellerCell, Housing
 
-import matplotlib.pyplot as plt
 from lirics import transform
 
 
+type VelocityFillValue = float
 type ScipyInterpolator = Callable[[tuple[NDArray, NDArray]], NDArray]
+
+
+class CellFieldInitializer(TypedDict):
+    """Typed dictionary containing necessary data for cell field initialization"""
+
+    cell: ImpellerCell
+    shape: tuple[int, int]
+
+    t: float
+    alpha: float
+    omega: float
+
+    u: NotRequired[VelocityFillValue]
+
+    rhoL: float
+    VL: float
+
+    MV: float
+    nV: float
+    pV: NotRequired[float]
+    TV: NotRequired[float]
+
+
+class FreeFieldInitializer(TypedDict):
+    """Typed dictionary containing necessary data for free field initialization"""
+
+    cell: ImpellerCell
+    housing: Housing
+
+    alpha: float
+
+    rhoL: float
+    muL: float
+
+    Pr: NotRequired[float]
+    avW: NotRequired[float]
 
 
 BACK_PHI_CORRECTION = np.deg2rad(0.5)
@@ -60,9 +96,12 @@ class CellField:
 
     """
 
-    def __init__(self, cell: ImpellerCell, shape: tuple[int, int]) -> None:
+    def __init__(self, initializer: CellFieldInitializer) -> None:
 
-        self._cell = cell
+        self._initializer = initializer
+
+        self._cell = cell = initializer["cell"]
+        shape = initializer["shape"]
 
         self.V = cell.V
         self.phir = cell.phi(cell.rrim)
@@ -72,29 +111,33 @@ class CellField:
         self.Af = cell.Af(self.r)
         self.dphidr = calculus.dydx(self.phi, self.r)
 
-        self.t = _SENTINEL
-        self.alpha = _SENTINEL
-        self.omega = _SENTINEL
+        self.t = initializer["t"]
+        self.alpha = initializer["alpha"]
+        self.omega = initializer["omega"]
 
-        self.rhoL = _SENTINEL
-        self.VL = _SENTINEL
+        self.rhoL = initializer["omega"]
+        self.VL = initializer["VL"]
         self.actVL = _SENTINEL
 
-        self.pV = _SENTINEL
-        self.VV = _SENTINEL
-        self.TV = _SENTINEL
-        self.rhoV = _SENTINEL
-        self.nV = _SENTINEL
-        self.mV = _SENTINEL
+        self.VV = self.V - self.VL
+        self.MV = initializer["MV"]
+        self.nV = initializer["nV"]
+        self.RV = self.MV/R
+        if "pV" in initializer and "TV" in initializer:
+            self.pV = initializer["pV"]
+            self.TV = initializer["TV"]
+            self.rhoV = self.pV/self.TV/self.RV
+            self.mV = self.rhoV*self.VV
         self.GV = _SENTINEL
-        self.RV = _SENTINEL
 
-        self.u = np.full_like(self.r, _SENTINEL)
-        self.w = np.full_like(self.r, _SENTINEL)
+        if "u" in initializer:
+            self.u = np.full_like(self.r, initializer["u"])
+            self.w = self.u * self.r * self.dphidr
 
         self.dudr = np.full_like(self.r, _SENTINEL)
         self.dwdr = np.full_like(self.r, _SENTINEL)
 
+        # Following is filled during cell flow solution
         self.dudt = np.full_like(self.r, _SENTINEL)
         self.dwdt = np.full_like(self.r, _SENTINEL)
 
@@ -316,10 +359,12 @@ class CellField:
                           (cell.delta * cell.l * cell.avmu))
         newton(self.errvof, rguesse)
 
+        # TODO : handle proper vapor parameters computations
+
         # At this point interface and liquid vof are resolved, so we can
         # compute vapor properties and then pressure on the rim
         self.VV = self.V - self.VL
-        self.mV = starred.mV + starred.GV*(self.t-starred.t)
+        self.mV = starred.mV + starred.GV*(self.t-starred.t)  # NOTE GV?
         self.rhoV = self.mV/self.VV
         self.pV = starred.pV * (starred.VV/self.VV)**self.nV
         self.TV = self.pV / (self.rhoV*self.RV)
@@ -328,41 +373,40 @@ class CellField:
 
 class FreeField(ABC):
 
-    def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
+    def __init__(self, initializer: FreeFieldInitializer) -> None:
 
-        self._cell = cell
-        self._housing = housing
+        self._initializer = initializer
+
+        self._cell = cell = initializer["cell"]
+        self._housing = housing = initializer["housing"]
 
         # Sectors geometrical parameters
-        self.epsilon = 0  # housing wall roughness
+        self.epsilon = housing.epsilon
         self.L = housing.L
         self.R = housing.R
         self.r = cell.rrim
 
-        # NOTE : phir must be added every time we pass alpha / automation?
+        # phir must be added every time we pass alpha
         self.phir = cell.phi(cell.rrim)
         self.delta = cell.delta
 
-        # NOTE : on field initialization
-        #        Probably it would be more convenient to set values of param containers to
-        #        some sentinel during object creation and adjust them afterwards with
-        #        special functionality. This goes both for free and cell fields, should
-        #        make "constructors" call signature lighter
+        self.alpha = initializer["alpha"]
+        self.alphar = self.alpha + self.phir
 
-        self.alpha = _SENTINEL
-
-        self.rho = _SENTINEL
-        self.mu = _SENTINEL
-
-        self.Pr = _SENTINEL
-
-        self.avPsi = _SENTINEL
-        self.avP = _SENTINEL
-        self.avW = _SENTINEL
+        self.rhoL = initializer["rhoL"]
+        self.muL = initializer["muL"]
 
         # Average velocities at boundaries
         self.avWB = _SENTINEL
         self.avWF = _SENTINEL
+
+        self._gR0 = g*self.R(0)
+        self.avPsi = self._gR0 - g*self.avR(self.alphar)*np.cos(self.alphar)
+        if "avW" in initializer and "Pr" in initializer:
+            self.avW = initializer["avW"]
+            self.Pr = initializer["Pr"]
+            self.avP = self.Pr + self.rhoL * \
+                self.avW**2 * self.kWCF(self.alphar)
 
         self.roots = np.full((1, 3), _SENTINEL)  # Cubic equation -> 3 roots
 
@@ -551,11 +595,12 @@ class FreeField(ABC):
         Said contributions are augmented into coefficients array during solution
         procedure."""
 
+        S = self.S(alpha)
         c = np.array([
             0,  # W^0 / should be based on prior field values
-            (self.kWPsi(alpha)*self.avPsi + self.Pr/self.rho)*self.S(alpha),  # W^1
+            (self.kWPsi(alpha)*self.avPsi + self.Pr/self.rhoL)*S,  # W^1
             0,  # W^2
-            (self.kWCF(alpha) + self.kWWW(alpha)/2)*self.S(alpha)  # W^3
+            (self.kWCF(alpha) + self.kWWW(alpha)/2)*S  # W^3
         ])
 
         return c
@@ -596,37 +641,33 @@ class FreeField(ABC):
         procedure for cell and free field in the liquid ring machines.
         """
 
+        self.alpha = coupled.alpha
+        self.alphar = self.alpha + self.phir
+
         self.updateWmodel(starred, coupled)
 
-        self.alpha = coupled.alpha
+        starred_alphar = starred.alpha + starred.phir
+        dalpha = self.alpha - starred.alpha
 
-        alphar = self.alpha + self.phir
-        astalphar = starred.alpha + starred.phir
-        dalpha = alphar - astalphar
-
-        gR0 = g*self.R(0)  # for Psi computations
-
-        c = self.coeffs(alphar)
-
-        # Starred fixed field contribution
-        c[0] -= polyval(starred.avW, starred.coeffs(astalphar))
-
-        # Coupled rotating field contribution
+        # Field coupling
         Ur = coupled.u[RIM, ANY]
         Wr = coupled.w[RIM, ANY] + coupled.omega*coupled.r[RIM, ANY]
         self.Pr = Pr = np.interp(self.phir, coupled.phi[RIM], coupled.prim)
-        Psir = gR0 - g*self.r*np.cos(alphar)
-        Jr = Psir + Pr/self.rho + (Ur**2 + Wr**2)/2
-        c[0] -= Ur*Jr*self.r*dalpha
-        # TODO : Extend CellField class to handle proper vapor parameters computations
+        Psir = self._gR0 - g*self.r*np.cos(self.alphar)
+        Jr = Psir + Pr/self.rhoL + (Ur**2 + Wr**2)/2
 
-        # Friction contribution
-        astkWf = starred.kWf(astalphar)
-        astxi = starred.xi(astalphar, dalpha)
-        astS = starred.S(astalphar)
-        c[0] -= astkWf*astxi/2*astS * starred.avW**3
+        # Friction effect
+        astkWf = starred.kWf(starred_alphar)
+        astxi = starred.xi(starred_alphar, dalpha)
+        astS = starred.S(starred_alphar)
 
-        self.roots = polyroots(c)  # roots of main equation
+        c = self.coeffs(self.alphar)
+        # external contributions
+        c[0] -= polyval(starred.avW, starred.coeffs(starred_alphar))  # starred
+        c[0] -= Ur*Jr*self.r*dalpha  # coupled
+        c[0] += astkWf*astxi/2 * starred.avW**3 * astS  # friction
+
+        self.roots = polyroots(c)
 
         # Getting 3 roots from cubic equtaion leads to root selection, currently it is
         # not known in what form roots are, we can get different values:
@@ -645,8 +686,8 @@ class FreeField(ABC):
 
         # Now it is possible to set section-average values
         self.avW = positive_real_root
-        self.avP = Pr + self.rho*self.avW**2 * self.kWCF(alphar)
-        self.avPsi = gR0 - g*self.avR(alphar)*np.cos(alphar)
+        self.avP = Pr + self.rhoL*self.avW**2 * self.kWCF(self.alphar)
+        self.avPsi = self._gR0 - g*self.avR(self.alphar)*np.cos(self.alphar)
 
         # Further course of action is to propagate parameters to boundaries of the
         # considred domain. Then results must be passed to mass imbalance check
@@ -656,18 +697,16 @@ class FreeField(ABC):
         """Propagates midline parameters to the domain boundaries assuming Bernoulli's
         principle is satisfied locally."""
 
-        alphar = self.alpha+self.phir
-        alphab = (alphar-self.delta/2,
-                  alphar+self.delta/2)
-        gR0 = g*self.R(0)
+        alphab = (self.alphar-self.delta/2,
+                  self.alphar+self.delta/2)
 
-        kWCF = self.kWCF(alphar)
+        kWCF = self.kWCF(self.alphar)
 
         Wb = []
         for loc in (BACK, FRONT):
 
             kWCFb = self.kWCF(alphab[loc])
-            avPsib = gR0 - g*self.avR(alphab[loc])*np.cos(alphab[loc])
+            avPsib = self._gR0 - g*self.avR(alphab[loc])*np.cos(alphab[loc])
             Prb = coupled.prim[loc]
 
             dPsi = self.avPsi - avPsib
@@ -675,7 +714,7 @@ class FreeField(ABC):
 
             Wb.append(
                 np.sqrt(
-                    1/(kWCFb+1/2) * (dPsi + dPr/self.rho +
+                    1/(kWCFb+1/2) * (dPsi + dPr/self.rhoL +
                                      (kWCF + 1/2)*self.avW**2)
                 )
             )
@@ -695,10 +734,10 @@ class FreeField(ABC):
     def P(self, R, alpha):
         """Computes flow pressure.
         Uses average value and distribution function under the hood."""
-        return self.Pr + self.rho * self.avW**2 * self.lamCF(R, alpha)
+        return self.Pr + self.rhoL * self.avW**2 * self.lamCF(R, alpha)
 
     def Re(self, alpha):
-        return self.avW * self.hydD(alpha) * self.rho / self.mu
+        return self.avW * self.hydD(alpha) * self.rhoL / self.muL
 
 
 # Some fresh ideas further
@@ -714,17 +753,15 @@ class UniformFreeField(FreeField):
 
 class LinearFreeFiled(FreeField):
 
-    def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
-        super().__init__(cell, housing)
+    def __init__(self, initializer: FreeFieldInitializer) -> None:
+        super().__init__(initializer)
         self.k = _SENTINEL
         self.b = _SENTINEL
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
-        alphar = self.alpha + self.phir
-
-        S = self.S(alphar)
-        R = self.R(alphar)
+        S = self.S(self.alphar)
+        R = self.R(self.alphar)
 
         self.k = -2/S
         self.b = 2/S*R
@@ -735,8 +772,8 @@ class LinearFreeFiled(FreeField):
 
 class QuadFreeField(FreeField):
 
-    def __init__(self, cell: ImpellerCell, housing: Housing) -> None:
-        super().__init__(cell, housing)
+    def __init__(self, initializaer: FreeFieldInitializer) -> None:
+        super().__init__(initializaer)
 
         # lamW profile coefficents
         self.a = _SENTINEL
@@ -749,12 +786,10 @@ class QuadFreeField(FreeField):
 
     def updateWmodel(self, starred: FreeField, coupled: CellField):
 
-        alphar = self.alpha + self.phir
-
         Wr = coupled.w[RIM, ANY] + coupled.omega*self.r
         r = self.r
-        R = self.R(alphar)
-        S = self.S(alphar)
+        R = self.R(self.alphar)
+        S = self.S(self.alphar)
 
         Rp = self.Rp
         dWdRp = self.dWdRp
@@ -773,17 +808,17 @@ class QuadFreeField(FreeField):
         return lamW
 
 
-def imbalance(astcf: CellField, cf: CellField, ff: FreeField):
+def imbalance(starred_cf: CellField, cf: CellField, ff: FreeField):
     # Function to compute mass imbalance of the overall solution step
 
-    alphar = cf.alpha + cf.phir
-    astalphar = astcf.alpha + astcf.phir
+    alphar = ff.alphar
+    dalpha = cf.alpha - starred_cf.alpha
 
-    dt = cf.t - astcf.t
+    dt = cf.t - starred_cf.t
 
-    dVLcdt = (cf.VL-astcf.VL)/dt
-    dVLfdt = (ff.V(alphar)-ff.V(astalphar))/dt
-    dVLdt = dVLcdt + dVLfdt
+    dVLCdt = (cf.VL - starred_cf.VL)/dt
+    dVLFdt = (ff.V(alphar) - ff.V(alphar-dalpha))/dt
+    dVLTdt = dVLCdt + dVLFdt
 
     delta = cf.delta
 
@@ -802,9 +837,7 @@ def imbalance(astcf: CellField, cf: CellField, ff: FreeField):
     QF = avwF*L*SF
     Qsum = QB - QF
 
-    return dVLdt - Qsum
-
-# Auxiliary functions
+    return dVLTdt - Qsum
 
 
 def pathinterp(path: tuple[np.ndarray, np.ndarray], intps: list[ScipyInterpolator]):

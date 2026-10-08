@@ -173,16 +173,39 @@ for i, (alph, rref) in enumerate(zip(alphadata, rifdata)):
     print(f"Capturing interface in the cell {i}")
 
     prior = fields.CellField(
-        cell, shape, VLfit(alph-dalpha), rho, omega)
-    field = fields.CellField(cell, shape, VLfit(alph), rho, omega)
+        {
+            "cell": cell,
+            "shape": shape,
 
-    prior.alpha = alph-dalpha
-    prior.t = prior.alpha/omega
+            "t": (alph-dalpha)/omega,
+            "alpha": alph-dalpha,
+            "omega": omega,
 
-    field.alpha = alph
-    field.t = field.alpha/omega
+            "u": 0.0,
 
-    # Manually setting prior velocity field acc. to fitted curves
+            "VL": VLfit(alph-dalpha),
+            "rhoL": rho,
+            "MV": 28.97e-3,
+            "nV": 1.4,
+        }
+    )
+    field = fields.CellField(
+        {
+            "cell": cell,
+            "shape": shape,
+
+            "t": prior.t + dt,
+            "alpha": prior.alpha + dalpha,
+            "omega": omega,
+
+            "VL": VLfit(alph),
+            "rhoL": 1000,
+            "MV": 28.97e-3,
+            "nV": 1.4,
+        }
+    )
+
+    # Manually computing prior velocity field acc. to fitted curves
     # to get proper velocity derivatives
     prior.u = -1/prior.Af * QLfit(alph)
     prior.w = prior.r * prior.u * prior.dphidr

@@ -196,6 +196,7 @@ class Housing(ABC):
     R(alpha) function for the profile."""
 
     L: float
+    epsilon: float
 
     @abstractmethod
     def R(self, alpha):

@@ -16,11 +16,13 @@ cell = ArchImpellerCell(
 )
 housing_single = CylindricalHousing(
     L := 1.01*l,
+    epsilon := 0.0,
     e := 12e-3,
     Rc=infer_housing_radius(rrim, e, Smin := 5e-3)
 )
 housing_double = EllipticHousing(
-    L := L,
+    L=housing_single.L,
+    epsilon=housing_single.epsilon,
     A=housing_single.e+housing_single.Rc,
     B=cell.rrim+Smin
 )

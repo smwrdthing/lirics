@@ -27,21 +27,48 @@ cell = design.ArchImpellerCell(
     s=5e-3
 )
 
-# Fields construction
-starred = fields.CellField(cell, (N_R_SEGMENTS, N_PHI_SEGMENTS))
-current = fields.CellField(cell, (N_R_SEGMENTS, N_PHI_SEGMENTS))
 
 # Fields initialization
 astVL = 3e-4
 Q = 5e-3
 dVL = Q*DT
 VL = astVL + dVL
-starred.t = current.t = 0
-starred.alpha = current.alpha = 0
-starred.omega = current.omega = OMEGA
-starred.rhoL = current.rhoL = DENSITY
-starred.VL = current.VL = astVL
-starred.u[:] = starred.w[:] = 0
+
+# Fields construction
+starred = fields.CellField(
+    {
+        "cell": cell,
+        "shape": (N_R_SEGMENTS, N_PHI_SEGMENTS),
+
+        "t": 0.0,
+        "alpha": 0.0,
+        "omega": OMEGA,
+
+        "u": 0.0,
+
+        "VL": astVL,
+        "rhoL": 1000,
+        "pV": 101325,
+        "TV": 20 + 273.15,
+        "MV": 28.97e-3,
+        "nV": 1.4,
+    }
+)
+current = fields.CellField(
+    {
+        "cell": cell,
+        "shape": (N_R_SEGMENTS, N_PHI_SEGMENTS),
+
+        "t": starred.t + DT,
+        "alpha": starred.alpha + DALPHA,
+        "omega": OMEGA,
+
+        "VL": VL,
+        "rhoL": 1000,
+        "MV": 28.97e-3,
+        "nV": 1.4,
+    }
+)
 
 # Fields computation
 current.t += DT
