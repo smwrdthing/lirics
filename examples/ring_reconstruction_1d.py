@@ -133,9 +133,11 @@ ax[0].plot(alpha, rrim, "k", linewidth=1)
 ax[0].plot(alpha, Rsingle, "k", linewidth=1)
 
 rif_calssic, alpha_classic = process_model(
-    classic, ax[0], linestyle="-")
+    classic, ax[0], linestyle='none', marker='.', markevery=5)
+
 rif_modified, alpha_modified = process_model(
-    modified, ax[0], linestyle='none', marker='.', markevery=5)
+    modified, ax[0], linestyle="-")
+
 
 # Configuring axes for classic vs modified PGR model error estimation
 ax[1].set_title("Modified model error estimation [mm]")
@@ -182,14 +184,14 @@ ax["B"].grid(True)
 
 ax["C"].set_title("Normalized interface profiles error")
 ax["C"].set_xlabel(r"$\hat{\alpha}\degree$")
-ax["C"].set_ylabel(r"$\Delta \hat{r}_{if}$")
+ax["C"].set_ylabel(r"$\Delta \hat{r}_{if} \cdot 100 \%$")
 ax["C"].set_xlim()
 ax["C"].grid(True)
 
 alpha_double_norm = normalize(alpha_double)
 alpha_single_norm = normalize(alpha_double)
-rif_double_norm = normalize(rif_double)
-rif_single_norm = normalize(rif_modified)
+rif_double_norm = rif_double/(cell.rrim*1e3)
+rif_single_norm = rif_modified/(cell.rrim*1e3)
 
 alpha_sample_norm = np.linspace(0, 1, len(alpha_double_norm))
 rif_normalized_error = (
@@ -199,7 +201,7 @@ rif_normalized_error = (
 
 ax["B"].plot(alpha_single_norm, rif_double_norm, "C0")
 ax["B"].plot(alpha_double_norm, rif_single_norm, "C1")
-ax["C"].plot(alpha_double_norm, rif_normalized_error, "m--")
+ax["C"].plot(alpha_double_norm, rif_normalized_error*100, "m--")
 ax["B"].legend(["single", "double"], loc="upper left", fontsize=10)
 
 plt.show()
