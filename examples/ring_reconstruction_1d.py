@@ -189,7 +189,7 @@ ax["C"].set_xlim()
 ax["C"].grid(True)
 
 alpha_double_norm = normalize(alpha_double)
-alpha_single_norm = normalize(alpha_double)
+alpha_single_norm = normalize(alpha_modified)
 rif_double_norm = rif_double/(cell.rrim*1e3)
 rif_single_norm = rif_modified/(cell.rrim*1e3)
 
@@ -199,9 +199,9 @@ rif_normalized_error = (
     - np.interp(alpha_sample_norm, alpha_single_norm, rif_single_norm))
 
 
-ax["B"].plot(alpha_single_norm, rif_double_norm, "C0")
-ax["B"].plot(alpha_double_norm, rif_single_norm, "C1")
-ax["C"].plot(alpha_double_norm, rif_normalized_error*100, "m")
+ax["B"].plot(alpha_single_norm, rif_single_norm, "C0")
+ax["B"].plot(alpha_double_norm, rif_double_norm, "C1")
+ax["C"].plot(alpha_sample_norm, rif_normalized_error*100, "m")
 ax["B"].legend(["single", "double"], loc="upper left", fontsize=10)
 
 plt.show()
