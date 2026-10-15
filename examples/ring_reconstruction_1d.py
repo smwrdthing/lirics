@@ -148,7 +148,10 @@ ax[1].plot(alpha_classic, (rif_modified-rif_calssic))
 
 # Configuring axes for single-acting vs double-acting modified PGR model comparison
 fig, ax = plt.subplot_mosaic(
-    "AB",
+    """
+    AB
+    AC
+    """,
     per_subplot_kw={
         "A": {"projection": "polar"},
     },
@@ -171,11 +174,17 @@ ax["A"].plot(alpha, Rdouble, "k", linewidth=1)
 rif_double, alpha_double = process_model(double, ax["A"])
 
 # Error plotting for normalized double acting vs modified single acting PGR models
-ax["B"].set_title("Normalizer interface profiles comparison")
+ax["B"].set_title("Normalized interface profiles comparison")
 ax["B"].set_xlabel(r"$\hat{\alpha}\degree$")
 ax["B"].set_ylabel(r"$\hat{r}_{if}$")
 ax["B"].set_xlim()
 ax["B"].grid(True)
+
+ax["C"].set_title("Normalized interface profiles error")
+ax["C"].set_xlabel(r"$\hat{\alpha}\degree$")
+ax["C"].set_ylabel(r"$\Delta \hat{r}_{if}$")
+ax["C"].set_xlim()
+ax["C"].grid(True)
 
 alpha_double_norm = normalize(alpha_double)
 alpha_single_norm = normalize(alpha_double)
@@ -190,7 +199,7 @@ rif_normalized_error = (
 
 ax["B"].plot(alpha_single_norm, rif_double_norm, "C0")
 ax["B"].plot(alpha_double_norm, rif_single_norm, "C1")
-ax["B"].plot(alpha_double_norm, rif_normalized_error, "m--")
-ax["B"].legend(["single", "double", "error"], loc="upper left", fontsize=10)
+ax["C"].plot(alpha_double_norm, rif_normalized_error, "m--")
+ax["B"].legend(["single", "double"], loc="upper left", fontsize=10)
 
 plt.show()
