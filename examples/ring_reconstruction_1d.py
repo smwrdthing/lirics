@@ -128,14 +128,16 @@ ax[0].plot([], "r")
 ax[0].legend(["suction", "compression", "discharge"],
              loc="center", fontsize=8)
 
-ax[0].plot(alpha, rhub, "k", linewidth=1)
-ax[0].plot(alpha, rrim, "k", linewidth=1)
-ax[0].plot(alpha, Rsingle, "k", linewidth=1)
+ax[0].plot(alpha, rhub, "k", linewidth=2)
+ax[0].plot(alpha, rrim, "k", linewidth=2)
+ax[0].plot(alpha, Rsingle, "k", linewidth=2)
 
 rif_calssic, alpha_classic = process_model(
-    classic, ax[0], linestyle="-")
+    classic, ax[0], linestyle='none', marker='.', markevery=5)
+
 rif_modified, alpha_modified = process_model(
-    modified, ax[0], linestyle='none', marker='.', markevery=5)
+    modified, ax[0], linestyle="-")
+
 
 # Configuring axes for classic vs modified PGR model error estimation
 ax[1].set_title("Modified model error estimation [mm]")
@@ -143,12 +145,15 @@ ax[1].set_theta_zero_location("N")
 ax[1].set_theta_direction(-1)
 
 # Error plotting for modified vs classic PGR models
-ax[1].plot(alpha_classic, (rif_modified-rif_calssic))
+ax[1].plot(alpha_classic, (rif_modified-rif_calssic), "m")
 
 
 # Configuring axes for single-acting vs double-acting modified PGR model comparison
 fig, ax = plt.subplot_mosaic(
-    "AB",
+    """
+    AB
+    AC
+    """,
     per_subplot_kw={
         "A": {"projection": "polar"},
     },
@@ -164,23 +169,29 @@ ax["A"].set_title("Interface reconstruction for double-acting machine")
 ax["A"].set_theta_zero_location("N")
 ax["A"].set_theta_direction(-1)
 
-ax["A"].plot(alpha, rhub, "k", linewidth=1)
-ax["A"].plot(alpha, rrim, "k", linewidth=1)
-ax["A"].plot(alpha, Rdouble, "k", linewidth=1)
+ax["A"].plot(alpha, rhub, "k", linewidth=2)
+ax["A"].plot(alpha, rrim, "k", linewidth=2)
+ax["A"].plot(alpha, Rdouble, "k", linewidth=2)
 
 rif_double, alpha_double = process_model(double, ax["A"])
 
 # Error plotting for normalized double acting vs modified single acting PGR models
-ax["B"].set_title("Normalizer interface profiles comparison")
+ax["B"].set_title("Normalized interface profiles comparison")
 ax["B"].set_xlabel(r"$\hat{\alpha}\degree$")
 ax["B"].set_ylabel(r"$\hat{r}_{if}$")
 ax["B"].set_xlim()
 ax["B"].grid(True)
 
+ax["C"].set_title("Normalized interface profiles error")
+ax["C"].set_xlabel(r"$\hat{\alpha}\degree$")
+ax["C"].set_ylabel(r"$\Delta \hat{r}_{if} \cdot 100 \%$")
+ax["C"].set_xlim()
+ax["C"].grid(True)
+
 alpha_double_norm = normalize(alpha_double)
-alpha_single_norm = normalize(alpha_double)
-rif_double_norm = normalize(rif_double)
-rif_single_norm = normalize(rif_modified)
+alpha_single_norm = normalize(alpha_modified)
+rif_double_norm = rif_double/(cell.rrim*1e3)
+rif_single_norm = rif_modified/(cell.rrim*1e3)
 
 alpha_sample_norm = np.linspace(0, 1, len(alpha_double_norm))
 rif_normalized_error = (
@@ -188,9 +199,9 @@ rif_normalized_error = (
     - np.interp(alpha_sample_norm, alpha_single_norm, rif_single_norm))
 
 
-ax["B"].plot(alpha_single_norm, rif_double_norm, "C0")
-ax["B"].plot(alpha_double_norm, rif_single_norm, "C1")
-ax["B"].plot(alpha_double_norm, rif_normalized_error, "m--")
-ax["B"].legend(["single", "double", "error"], loc="upper left", fontsize=10)
+ax["B"].plot(alpha_single_norm, rif_single_norm, "C0")
+ax["B"].plot(alpha_double_norm, rif_double_norm, "C1")
+ax["C"].plot(alpha_sample_norm, rif_normalized_error*100, "m")
+ax["B"].legend(["single", "double"], loc="upper left", fontsize=10)
 
 plt.show()
