@@ -524,6 +524,15 @@ class FreeField(ABC):
 
         return integral/self.S(alpha)
 
+    def kWW(self, alpha, n=NUM_INTEGRATION):
+        """Compmutes average for integral of the squared velocity profile shape function.
+        Determines coefficient for """
+
+        x = np.linspace(self.r, self.R(alpha), n)
+        integral = np.trapezoid(self.lamW(x, alpha)**2, x, axis=0)
+
+        return integral/self.S(alpha)
+
     def kWWW(self, alpha, n=NUM_INTEGRATION):
         """Compmutes average for integral of the cubed velocity profile shape function.
         Determines coefficent in the cubic equation in average velocity."""
@@ -696,11 +705,14 @@ class FreeField(ABC):
                   self.alphar + self.delta/2)
 
         kWCF = self.kWCF(self.alphar)
+        kWW = self.kWW(self.alphar)
 
         Wb = []
         for loc in (BACK, FRONT):
 
             kWCFb = self.kWCF(alphab[loc])
+            kWWb = self.kWW(alphab[loc])
+
             avPsib = self._gR0 - g*self.avR(alphab[loc])*np.cos(alphab[loc])
             Prb = coupled.prim[loc]
 
@@ -709,7 +721,8 @@ class FreeField(ABC):
 
             Wb.append(
                 np.sqrt(
-                    (dPsi + dPr/self.rhoL + (kWCF+1/2)*self.avW**2) / (kWCFb+1/2)
+                    (dPsi + dPr/self.rhoL + (kWCF+kWW/2)
+                     * self.avW**2) / (kWCFb+kWWb/2)
                 )
             )
 
