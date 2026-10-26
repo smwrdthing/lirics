@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lirics import design, fields
+from lirics import design, fields, transform
 
 # For free flow solution we need to construct proper cell-flow solution for
 # coupling
@@ -14,7 +14,7 @@ LIQ_VISCOSITY = 1e-3
 VAP_MOLMASS = 28.97e-3
 VAP_HCRATIO = 1.4
 
-DALPHA = np.deg2rad(5)
+DALPHA = np.deg2rad(3)
 DT = DALPHA/OMEGA
 
 NUM_OF_CELLS = 12
@@ -42,12 +42,23 @@ housing = design.CylindricalHousing(
 
 # Cell fields initialization
 astVL = 0.2*cell.V
-Qs = np.linspace(1.8, 1.9)*1e-2
+Qs = np.linspace(0, 2, 5)*1e-3
 
 VLs = []
 dVs = []
 
 fig, ax = plt.subplots()
+ax.set_title("Interface capturing in the cell\nof the liquid ring machine")
+ax.set_xlabel("x, mm")
+ax.set_ylabel("y, mm")
+ax.set_aspect("equal")
+
+# Impeller bounds
+xhub, yhub = transform.rphi_to_xy(
+    cell.rhub*np.ones(100), np.linspace(0, 2*np.pi, 100))
+xrim, yrim = transform.rphi_to_xy(
+    cell.rrim*np.ones(100), np.linspace(0, 2*np.pi, 100))
+
 
 for Q in Qs:
 
@@ -111,21 +122,44 @@ for Q in Qs:
         {
             "cell": cell,
             "housing": housing,
-            "alpha": starred_cf.alpha,
+            "alpha": cf.alpha,
             "rhoL": LIQ_DENSITY,
             "muL": LIQ_VISCOSITY,
         }
     )
+
     ff.solve(starred_ff, cf)
     dV = fields.imbalance(starred_cf, cf, ff)
     dVs.append(dV)
+
+    # Grid
+    if len(ax.lines) == 0:
+        x_grid, y_grid = transform.rphi_to_xy(cf.r, cf.phi)
+        x_grid, y_grid = x_grid*1e3, y_grid*1e3
+
+        xlims = (np.min(x_grid)*1e3-20, np.max(x_grid)*1e3+20)
+        ylims = (np.min(y_grid)*1e3-20, np.max(y_grid)*1e3+20)
+
+        m, n = np.shape(cf.r)
+
+        ax.plot(x_grid, y_grid, "0.5", linewidth=0.75)
+        ax.plot(x_grid.T, y_grid.T, "0.5", linewidth=0.75)
+        ax.plot(
+            x_grid[:, int(n/2)],
+            y_grid[:, int(m/2)],
+            "C1-.", linewidth=3)
+
+    xif, yif = transform.rphi_to_xy(cf.rif, cf.phiif)
+    xif, yif = xif*1e3, yif*1e3
+    ax.plot(xif, yif)
 
 VLs = np.ravel(VLs)
 dVs = np.ravel(dVs)
 
 VLsol = np.interp(0, dVs, VLs)
 
-plt.plot(VLs/cell.V*100, dVs/cell.V*100)
-plt.plot(VLsol/cell.V*100, 0, "ro")
+fig, ax = plt.subplots()
+ax.plot(VLs/cell.V*100, dVs/cell.V*100)
+ax.plot(VLsol/cell.V*100, 0, "ro")
 
 plt.show()
