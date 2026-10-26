@@ -14,7 +14,7 @@ LIQ_VISCOSITY = 1e-3
 VAP_MOLMASS = 28.97e-3
 VAP_HCRATIO = 1.4
 
-DALPHA = np.deg2rad(3)
+DALPHA = np.deg2rad(5)
 DT = DALPHA/OMEGA
 
 NUM_OF_CELLS = 12
@@ -42,7 +42,7 @@ housing = design.CylindricalHousing(
 
 # Cell fields initialization
 astVL = 0.2*cell.V
-Qs = np.linspace(0.0, 1.9)*1e-2
+Qs = np.linspace(1.8, 1.9)*1e-2
 
 VLs = []
 dVs = []
